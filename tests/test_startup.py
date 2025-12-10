@@ -294,7 +294,10 @@ class TestJobRegistryInitialization:
             job = job_registry.create_job(
                 job_type='web_scraper',
                 job_id=1,
-                config={'url': 'https://example.com', 'selectors': {}},
+                config={
+                    'url': 'https://example.com',
+                    'selectors': {'title': 'h1', 'content': 'p'}
+                },
                 user_id=1
             )
             assert job is not None

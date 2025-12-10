@@ -538,17 +538,39 @@ class TestJobService:
         assert 'Unknown job type' in error
     
     def test_get_user_jobs(self, db_session):
-        """Test getting user jobs."""
+        """Test getting user jobs with pagination."""
         service = JobService(db_session)
-        
+
         # Mock query results
         mock_jobs = [Mock(spec=Job), Mock(spec=Job)]
         mock_query = Mock()
-        mock_query.filter.return_value.order_by.return_value.limit.return_value.offset.return_value.all.return_value = mock_jobs
-        
+
+        # Mock the query chain
+        filter_result = Mock()
+        order_result = Mock()
+        filter_result.order_by.return_value = order_result
+        mock_query.filter.return_value = filter_result
+
+        # Mock count() to return an integer
+        order_result.count.return_value = 2
+
+        # Mock limit/offset/all chain
+        limit_result = Mock()
+        offset_result = Mock()
+        order_result.limit.return_value = limit_result
+        limit_result.offset.return_value = offset_result
+        offset_result.all.return_value = mock_jobs
+
         with patch.object(db_session, 'query', return_value=mock_query):
-            jobs = service.get_user_jobs(1)
-            assert len(jobs) == 2
+            result = service.get_user_jobs(1)
+
+            # Check pagination dictionary
+            assert 'jobs' in result
+            assert 'page' in result
+            assert 'total' in result
+            assert len(result['jobs']) == 2
+            assert result['total'] == 2
+            assert result['page'] == 1
     
     def test_execute_job_success(self, db_session):
         """Test successful job execution."""

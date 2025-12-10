@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Welcome Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to Muninn</h1>
+            <p class="text-xl text-gray-600">Your intelligent automation platform for streamlining workflows</p>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div class="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition-shadow">
+                <div class="text-blue-600 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Create Job</h3>
+                <p class="text-gray-600 mb-4">Set up a new automation workflow</p>
+                <a href="{{ url_for('jobs.create_job') }}" 
+                   class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Get Started
+                </a>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition-shadow">
+                <div class="text-green-600 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">View Jobs</h3>
+                <p class="text-gray-600 mb-4">Monitor and manage your jobs</p>
+                <a href="{{ url_for('jobs.job_list') }}" 
+                   class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                    View All
+                </a>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition-shadow">
+                <div class="text-purple-600 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Execute Jobs</h3>
+                <p class="text-gray-600 mb-4">Run jobs on demand</p>
+                <a href="{{ url_for('jobs.job_list') }}" 
+                   class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                    Run Now
+                </a>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition-shadow">
+                <div class="text-orange-600 mb-4">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Health Check</h3>
+                <p class="text-gray-600 mb-4">System status and monitoring</p>
+                <a href="{{ url_for('main.health_check') }}" 
+                   class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded">
+                    Check Status
+                </a>
+            </div>
+        </div>
+
+        <!-- Job Types Overview -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Available Job Types</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-blue-600 mb-3">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Web Scraper</h3>
+                    <p class="text-sm text-gray-600">Extract data from websites using CSS selectors</p>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-green-600 mb-3">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 mb-2">RSS Reader</h3>
+                    <p class="text-sm text-gray-600">Parse and monitor RSS feeds with filtering</p>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-purple-600 mb-3">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Filter</h3>
+                    <p class="text-sm text-gray-600">Filter and transform data with configurable rules</p>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-orange-600 mb-3">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Email Sender</h3>
+                    <p class="text-sm text-gray-600">Send automated emails with attachments</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Getting Started -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Getting Started</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3 text-sm font-bold">1</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Choose Job Type</h3>
+                    <p class="text-sm text-gray-600">Select from our pre-built job types or create custom ones</p>
+                </div>
+                <div class="text-center">
+                    <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3 text-sm font-bold">2</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Configure Settings</h3>
+                    <p class="text-sm text-gray-600">Set up your job parameters and automation rules</p>
+                </div>
+                <div class="text-center">
+                    <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3 text-sm font-bold">3</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Execute & Monitor</h3>
+                    <p class="text-sm text-gray-600">Run your jobs and track their execution status</p>
+                </div>
+            </div>
+            <div class="text-center mt-6">
+                <a href="{{ url_for('jobs.create_job') }}" 
+                   class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+                    Create Your First Job
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

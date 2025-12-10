@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule Job - {{ job.name }} - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex items-center mb-8">
+            <a href="{{ url_for('scheduler.scheduler_dashboard') }}" 
+               class="text-gray-500 hover:text-gray-700 mr-4">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h1 class="text-3xl font-bold text-gray-900">Schedule Job: {{ job.name }}</h1>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <form method="POST" action="{{ url_for('scheduler.schedule_job', job_id=job.id) }}">
+                <div class="space-y-6">
+                    <!-- Job Information -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">Job Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Job Name</label>
+                                <div class="mt-1 text-sm text-gray-900">{{ job.name }}</div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Job Type</label>
+                                <div class="mt-1 text-sm text-gray-900">{{ job.job_type|replace('_', ' ')|title }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Schedule Type -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Type</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="radio" name="schedule_type" value="cron" checked 
+                                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-700">Cron Expression</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="schedule_type" value="interval" 
+                                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-700">Interval (minutes)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Cron Expression -->
+                    <div id="cron-section">
+                        <label for="cron_expression" class="block text-sm font-medium text-gray-700 mb-2">
+                            Cron Expression
+                        </label>
+                        <input type="text" 
+                               id="cron_expression" 
+                               name="cron_expression" 
+                               value="{{ job.schedule_cron or '' }}"
+                               placeholder="0 */6 * * * (every 6 hours)"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <p class="mt-1 text-sm text-gray-500">
+                            Use standard cron syntax. 
+                            <a href="{{ url_for('scheduler.cron_help') }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                View cron help
+                            </a>
+                        </p>
+                    </div>
+
+                    <!-- Interval -->
+                    <div id="interval-section" class="hidden">
+                        <label for="interval_minutes" class="block text-sm font-medium text-gray-700 mb-2">
+                            Interval (minutes)
+                        </label>
+                        <input type="number" 
+                               id="interval_minutes" 
+                               name="interval_minutes" 
+                               min="1" 
+                               max="525600"
+                               placeholder="60"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <p class="mt-1 text-sm text-gray-500">How often to run the job (1-525600 minutes)</p>
+                    </div>
+
+                    <!-- Current Schedule Info -->
+                    {% if job.schedule_enabled and job.schedule_cron %}
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-blue-800 mb-2">Current Schedule</h4>
+                        <div class="text-sm text-blue-700">
+                            <p><strong>Cron:</strong> <code class="bg-blue-100 px-2 py-1 rounded">{{ job.schedule_cron }}</code></p>
+                            {% if job.next_scheduled_run %}
+                            <p><strong>Next Run:</strong> {{ job.next_scheduled_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+                            {% endif %}
+                            {% if job.last_scheduled_run %}
+                            <p><strong>Last Run:</strong> {{ job.last_scheduled_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex justify-end space-x-4 mt-8">
+                    <a href="{{ url_for('scheduler.scheduler_dashboard') }}" 
+                       class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        {{ 'Update Schedule' if job.schedule_enabled else 'Schedule Job' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cronRadio = document.querySelector('input[name="schedule_type"][value="cron"]');
+    const intervalRadio = document.querySelector('input[name="schedule_type"][value="interval"]');
+    const cronSection = document.getElementById('cron-section');
+    const intervalSection = document.getElementById('interval-section');
+    
+    function toggleSections() {
+        if (cronRadio.checked) {
+            cronSection.classList.remove('hidden');
+            intervalSection.classList.add('hidden');
+        } else {
+            cronSection.classList.add('hidden');
+            intervalSection.classList.remove('hidden');
+        }
+    }
+    
+    cronRadio.addEventListener('change', toggleSections);
+    intervalRadio.addEventListener('change', toggleSections);
+    
+    // Initialize
+    toggleSections();
+});
+</script>
+{% endblock %}

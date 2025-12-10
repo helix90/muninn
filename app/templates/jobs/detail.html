@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.name }} - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Job Header -->
+        <div class="flex justify-between items-start mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ job.name }}</h1>
+                <p class="text-gray-600 mt-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                        {{ job.job_type|replace('_', ' ')|title }}
+                    </span>
+                    <span class="ml-3 text-sm text-gray-500">
+                        Created {{ job.created_at.strftime('%Y-%m-%d at %H:%M') }}
+                    </span>
+                </p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{{ url_for('jobs.edit_job', job_id=job.id) }}" 
+                   class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                    Edit Job
+                </a>
+                <button onclick="executeJob({{ job.id }})" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                    Execute Now
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Job Information -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Job Configuration -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Configuration</h2>
+                    <div class="space-y-4">
+                        {% if schema %}
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Description</h3>
+                            <p class="text-sm text-gray-600">{{ schema.description }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for key, value in job.config.items() %}
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    {{ key|replace('_', ' ')|title }}
+                                </label>
+                                <div class="text-sm text-gray-900">
+                                    {% if value is mapping %}
+                                        <pre class="bg-gray-50 p-2 rounded text-xs overflow-x-auto">{{ value|tojson(indent=2) }}</pre>
+                                    {% elif value is sequence and value is not string %}
+                                        <div class="space-y-1">
+                                            {% for item in value %}
+                                            <div class="bg-gray-50 px-2 py-1 rounded text-xs">{{ item }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execution History -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Execution History</h2>
+                    {% if runs %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Run ID
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Started
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Duration
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Details
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for run in runs %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        #{{ run.id }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                            {% if run.status == 'completed' %}bg-green-100 text-green-800
+                                            {% elif run.status == 'failed' %}bg-red-100 text-red-800
+                                            {% elif run.status == 'running' %}bg-yellow-100 text-yellow-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ run.status|title }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                        {{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                        {% if run.get_duration() %}
+                                            {{ "%.2f"|format(run.get_duration()) }}s
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                        {% if run.error_message %}
+                                            <button onclick="showErrorDetails('{{ run.error_message|replace("'", "\\'") }}')" 
+                                                    class="text-red-600 hover:text-red-900">View Error</button>
+                                        {% elif run.output_data %}
+                                            <button onclick="showOutputDetails(this)" 
+                                                    data-output="{{ run.output_data|tojson|e }}"
+                                                    class="text-blue-600 hover:text-blue-900">View Output</button>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-8">
+                        <div class="text-gray-400 mb-2">
+                            <svg class="mx-auto h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </div>
+                        <p class="text-gray-500">No executions yet</p>
+                        <button onclick="executeJob({{ job.id }})" 
+                                class="mt-3 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                            Execute Now
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Job Sidebar -->
+            <div class="space-y-6">
+                <!-- Job Status -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Job Status</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Status:</span>
+                            <span class="text-sm font-medium 
+                                {% if job.is_active %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ 'Active' if job.is_active else 'Inactive' }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Last Updated:</span>
+                            <span class="text-sm text-gray-900">{{ job.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Total Runs:</span>
+                            <span class="text-sm font-medium text-gray-900">{{ runs|length }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+                    <div class="space-y-3">
+                        <button onclick="executeJob({{ job.id }})" 
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                            Execute Job
+                        </button>
+                        <a href="{{ url_for('jobs.edit_job', job_id=job.id) }}" 
+                           class="block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                            Edit Configuration
+                        </a>
+                        <button onclick="deleteJob({{ job.id }}, '{{ job.name }}')" 
+                                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                            Delete Job
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Job Type Info -->
+                {% if schema %}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Job Type Information</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-700">Type:</span>
+                            <span class="text-sm text-gray-900 ml-2">{{ schema.job_type|replace('_', ' ')|title }}</span>
+                        </div>
+                        {% if schema.required_fields %}
+                        <div>
+                            <span class="text-sm font-medium text-gray-700">Required Fields:</span>
+                            <div class="mt-1">
+                                {% for field in schema.required_fields %}
+                                <span class="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded mr-1 mb-1">
+                                    {{ field }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if schema.optional_fields %}
+                        <div>
+                            <span class="text-sm font-medium text-gray-700">Optional Fields:</span>
+                            <div class="mt-1">
+                                {% for field in schema.optional_fields %}
+                                <span class="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded mr-1 mb-1">
+                                    {{ field }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Delete Job</h3>
+            <p class="text-gray-500 mb-6">Are you sure you want to delete "<span id="jobNameToDelete"></span>"? This action cannot be undone.</p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeDeleteModal()" 
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                    Cancel
+                </button>
+                <button id="confirmDeleteBtn" 
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Details Modal -->
+<div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Error Details</h3>
+            <div id="errorContent" class="bg-red-50 p-4 rounded text-sm text-red-800 mb-4"></div>
+            <div class="flex justify-end">
+                <button onclick="closeErrorModal()" 
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Output Details Modal -->
+<div id="outputModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg p-6 max-w-4xl mx-4 max-h-screen overflow-y-auto">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Execution Output</h3>
+            <div id="outputContent" class="bg-gray-50 p-4 rounded text-sm text-gray-800 mb-4 font-mono"></div>
+            <div class="flex justify-end">
+                <button onclick="closeOutputModal()" 
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function executeJob(jobId) {
+    if (confirm('Execute this job now?')) {
+        fetch(`/jobs/${jobId}/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while executing the job');
+        });
+    }
+}
+
+function deleteJob(jobId, jobName) {
+    document.getElementById('jobNameToDelete').textContent = jobName;
+    document.getElementById('deleteModal').classList.remove('hidden');
+    
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/jobs/${jobId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    };
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+}
+
+function showErrorDetails(errorMessage) {
+    document.getElementById('errorContent').textContent = errorMessage;
+    document.getElementById('errorModal').classList.remove('hidden');
+}
+
+function closeErrorModal() {
+    document.getElementById('errorModal').classList.add('hidden');
+}
+
+function showOutputDetails(buttonElement) {
+    // Get the output data from the data attribute of the clicked button
+    const outputData = JSON.parse(buttonElement.getAttribute('data-output'));
+    // Display the output
+    document.getElementById('outputContent').textContent = JSON.stringify(outputData, null, 2);
+    document.getElementById('outputModal').classList.remove('hidden');
+}
+
+function closeOutputModal() {
+    document.getElementById('outputModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

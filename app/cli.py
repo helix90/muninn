@@ -5,7 +5,7 @@ CLI commands for Muninn
 import click
 from flask.cli import with_appcontext
 from app.extensions import db
-from app.models import Base, User, Job, JobRun, JobChain
+from app.models import User, Job, JobRun, JobChain
 from werkzeug.security import generate_password_hash
 from sqlalchemy import text
 import json
@@ -17,7 +17,7 @@ def init_db_command():
     """Initialize the database."""
     try:
         click.echo('Creating database tables...')
-        Base.metadata.create_all(db.engine)
+        db.create_all()
         click.echo('Database tables created successfully!')
     except Exception as e:
         click.echo(f'Error creating database tables: {e}', err=True)

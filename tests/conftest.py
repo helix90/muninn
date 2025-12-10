@@ -7,26 +7,25 @@ import tempfile
 import pytest
 from app import create_app
 from app.extensions import db
-from app.models import Base
 
 
 @pytest.fixture
 def app():
     """Create and configure a new app instance for each test."""
-    
+
     # Create the app with testing configuration
     app = create_app('testing')
-    
+
     # Ensure the app context is available
     with app.app_context():
-        # Create all database tables using Base metadata
-        Base.metadata.create_all(db.engine)
-        
+        # Create all database tables
+        db.create_all()
+
         yield app
-        
+
         # Clean up database after each test
         db.session.remove()
-        Base.metadata.drop_all(db.engine)
+        db.drop_all()
 
 
 @pytest.fixture

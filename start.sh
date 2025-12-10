@@ -8,7 +8,7 @@
 export FLASK_ENV=development
 export FLASK_DEBUG=True
 export FLASK_HOST=0.0.0.0
-export FLASK_PORT=5000
+export FLASK_PORT=5050
 
 # Application Configuration
 export SECRET_KEY=dev-secret-key-change-in-production

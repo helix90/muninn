@@ -312,4 +312,178 @@ class JobChain(db.Model):
         return config
     
     def __repr__(self):
-        return f'<JobChain {self.parent_job_id} -> {self.child_job_id}>' 
+        return f'<JobChain {self.parent_job_id} -> {self.child_job_id}>'
+
+
+class Event(db.Model):
+    """Event model for agent-to-agent communication."""
+
+    __tablename__ = 'events'
+
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(Integer, ForeignKey('jobs.id'), nullable=False, index=True)
+    agent_type = Column(String(50), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    payload = Column(JSON, nullable=False, default=dict)
+    event_metadata = Column('metadata', JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship('User')
+    agent = relationship('Job', foreign_keys=[agent_id])
+
+    # Constraints
+    __table_args__ = (
+        Index('idx_events_agent_created', 'agent_id', 'created_at'),
+        Index('idx_events_user_created', 'user_id', 'created_at'),
+        Index('idx_events_type_created', 'agent_type', 'created_at'),
+        Index('idx_events_expires', 'expires_at'),
+    )
+
+    def __init__(self, agent_id, agent_type, user_id, payload, metadata=None, expires_at=None):
+        self.agent_id = agent_id
+        self.agent_type = agent_type
+        self.user_id = user_id
+        self.payload = payload or {}
+        self.event_metadata = metadata or {}
+        self.expires_at = expires_at
+
+    @validates('payload', 'event_metadata')
+    def validate_json_data(self, key, data):
+        """Validate JSON data is a dictionary."""
+        if not isinstance(data, dict):
+            raise ValueError(f"{key} must be a dictionary")
+        return data
+
+    def to_dict(self):
+        """Convert event to dictionary."""
+        return {
+            'id': self.id,
+            'agent_id': self.agent_id,
+            'agent_type': self.agent_type,
+            'user_id': self.user_id,
+            'payload': self.payload,
+            'metadata': self.event_metadata,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }
+
+    def get_payload_field(self, field_path, default=None):
+        """Get a field from payload using dot notation (e.g., 'user.name')."""
+        try:
+            value = self.payload
+            for key in field_path.split('.'):
+                value = value[key]
+            return value
+        except (KeyError, TypeError):
+            return default
+
+    def is_expired(self):
+        """Check if event has expired."""
+        if self.expires_at is None:
+            return False
+        return datetime.utcnow() > self.expires_at
+
+    def __repr__(self):
+        return f'<Event {self.id} from Agent {self.agent_id} ({self.agent_type})>'
+
+
+class AgentMemory(db.Model):
+    """AgentMemory model for persistent agent state storage."""
+
+    __tablename__ = 'agent_memory'
+
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(Integer, ForeignKey('jobs.id'), nullable=False, index=True)
+    key = Column(String(255), nullable=False)
+    value = Column(JSON, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    agent = relationship('Job', foreign_keys=[agent_id])
+
+    # Constraints
+    __table_args__ = (
+        Index('idx_agent_memory_agent_key', 'agent_id', 'key', unique=True),
+        Index('idx_agent_memory_expires', 'expires_at'),
+    )
+
+    def __init__(self, agent_id, key, value, expires_at=None):
+        self.agent_id = agent_id
+        self.key = key
+        self.value = value
+        self.expires_at = expires_at
+
+    @validates('key')
+    def validate_key(self, key_name, key_value):
+        """Validate key is not empty."""
+        if not key_value or len(key_value) == 0:
+            raise ValueError("Key cannot be empty")
+        if len(key_value) > 255:
+            raise ValueError("Key cannot be longer than 255 characters")
+        return key_value
+
+    @validates('value')
+    def validate_value(self, key, value):
+        """Validate value is JSON-serializable."""
+        import json
+        try:
+            json.dumps(value)
+            return value
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Value must be JSON-serializable: {e}")
+
+    def is_expired(self):
+        """Check if memory has expired."""
+        if self.expires_at is None:
+            return False
+        return datetime.utcnow() > self.expires_at
+
+    def __repr__(self):
+        return f'<AgentMemory {self.agent_id}:{self.key}>'
+
+
+class AgentLink(db.Model):
+    """AgentLink model for defining agent connections and data flow."""
+
+    __tablename__ = 'agent_links'
+
+    id = Column(Integer, primary_key=True)
+    source_agent_id = Column(Integer, ForeignKey('jobs.id'), nullable=False, index=True)
+    target_agent_id = Column(Integer, ForeignKey('jobs.id'), nullable=False, index=True)
+    config = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Relationships
+    source_agent = relationship('Job', foreign_keys=[source_agent_id])
+    target_agent = relationship('Job', foreign_keys=[target_agent_id])
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint('source_agent_id != target_agent_id', name='no_self_link'),
+        Index('idx_agent_links_source', 'source_agent_id'),
+        Index('idx_agent_links_target', 'target_agent_id'),
+        Index('idx_agent_links_both', 'source_agent_id', 'target_agent_id', unique=True),
+        Index('idx_agent_links_active', 'is_active'),
+    )
+
+    def __init__(self, source_agent_id, target_agent_id, config=None):
+        if source_agent_id == target_agent_id:
+            raise ValueError("Source and target agent cannot be the same")
+        self.source_agent_id = source_agent_id
+        self.target_agent_id = target_agent_id
+        self.config = config or {}
+
+    @validates('config')
+    def validate_config(self, key, config):
+        """Validate config is a dictionary."""
+        if not isinstance(config, dict):
+            raise ValueError("Config must be a dictionary")
+        return config
+
+    def __repr__(self):
+        return f'<AgentLink {self.source_agent_id} -> {self.target_agent_id}>' 

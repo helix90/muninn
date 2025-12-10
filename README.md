@@ -124,14 +124,19 @@ cp env.example .env
 nano .env
 ```
 
+**Note:** The `.env` file is **automatically loaded** by python-decouple when the application starts. You don't need to manually export environment variables or use scripts to load them.
+
 ### 6. Run the Application
 
 ```bash
-# Development mode
+# Development mode (automatically loads .env)
 flask run
 
-# Or using Python directly
+# Or using Python directly (automatically loads .env)
 python run.py
+
+# Or using the convenience script (sets env vars manually - optional)
+./start.sh
 ```
 
 The application will be available at `http://0.0.0.0:5000` (accessible from any network interface)
@@ -273,6 +278,8 @@ docker-compose down
 - **redis**: Redis 7 for caching and sessions
 
 ## 🔧 Configuration
+
+Muninn uses **python-decouple** for configuration management, which automatically loads `.env` files. Simply create a `.env` file in the project root (copy from `env.example`) and your settings will be loaded automatically.
 
 ### Environment Variables
 

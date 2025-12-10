@@ -4,7 +4,7 @@ Encryption utilities for sensitive job configuration data
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from base64 import urlsafe_b64encode
 from flask import current_app
 
@@ -31,8 +31,8 @@ class ConfigEncryption:
         """
         secret_key = current_app.config['SECRET_KEY'].encode()
 
-        # Derive 32-byte key from SECRET_KEY using PBKDF2
-        kdf = PBKDF2(
+        # Derive 32-byte key from SECRET_KEY using PBKDF2HMAC
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=b'muninn_encryption_salt',  # Fixed salt for deterministic key derivation

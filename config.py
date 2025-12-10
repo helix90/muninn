@@ -1,28 +1,28 @@
 import os
-from decouple import config
+from decouple import config as env_config
 
 
 class Config:
     """Base configuration class."""
-    
+
     # Flask configuration
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SECRET_KEY = env_config('SECRET_KEY', default='dev-secret-key-change-in-production')
     DEBUG = False
     TESTING = False
-    
+
     # Logging configuration
-    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+    LOG_LEVEL = env_config('LOG_LEVEL', default='INFO')
     LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    
+
     # Database configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://muninn:muninn_pass@localhost:5432/muninn_dev')
+    DATABASE_URL = env_config('DATABASE_URL', default='postgresql://muninn:muninn_pass@localhost:5432/muninn_dev')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': int(os.environ.get('DB_POOL_SIZE', 10)),
-        'pool_timeout': int(os.environ.get('DB_POOL_TIMEOUT', 20)),
-        'pool_recycle': int(os.environ.get('DB_POOL_RECYCLE', 3600)),
-        'max_overflow': int(os.environ.get('DB_MAX_OVERFLOW', 20)),
+        'pool_size': env_config('DB_POOL_SIZE', default=10, cast=int),
+        'pool_timeout': env_config('DB_POOL_TIMEOUT', default=20, cast=int),
+        'pool_recycle': env_config('DB_POOL_RECYCLE', default=3600, cast=int),
+        'max_overflow': env_config('DB_MAX_OVERFLOW', default=20, cast=int),
     }
     
     # Security configuration
@@ -57,17 +57,17 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     """Testing configuration."""
-    
+
     TESTING = True
     DEBUG = True
     LOG_LEVEL = 'DEBUG'
-    
+
     # Testing-specific settings
     WTF_CSRF_ENABLED = False
     PRESERVE_CONTEXT_ON_EXCEPTION = False
-    
+
     # Testing database settings
-    DATABASE_URL = os.environ.get('TEST_DATABASE_URL', 'postgresql://muninn:muninn_pass@localhost:5432/muninn_test')
+    DATABASE_URL = env_config('TEST_DATABASE_URL', default='postgresql://muninn:muninn_pass@localhost:5432/muninn_test')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 1,
@@ -79,19 +79,19 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """Production configuration."""
-    
+
     DEBUG = False
     LOG_LEVEL = 'WARNING'
-    
+
     # Production-specific settings
     SESSION_COOKIE_SECURE = True
-    
+
     # Production database settings
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': int(os.environ.get('DB_POOL_SIZE', 20)),
-        'pool_timeout': int(os.environ.get('DB_POOL_TIMEOUT', 30)),
-        'pool_recycle': int(os.environ.get('DB_POOL_RECYCLE', 3600)),
-        'max_overflow': int(os.environ.get('DB_MAX_OVERFLOW', 30)),
+        'pool_size': env_config('DB_POOL_SIZE', default=20, cast=int),
+        'pool_timeout': env_config('DB_POOL_TIMEOUT', default=30, cast=int),
+        'pool_recycle': env_config('DB_POOL_RECYCLE', default=3600, cast=int),
+        'max_overflow': env_config('DB_MAX_OVERFLOW', default=30, cast=int),
         'pool_pre_ping': True,  # Connection health check
     }
     

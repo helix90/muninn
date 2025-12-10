@@ -25,12 +25,11 @@ logger = logging.getLogger(__name__)
 
 class JobScheduler:
     """Robust job scheduler using APScheduler."""
-    
+
     def __init__(self, app=None):
         self.app = app
         self.scheduler = None
         self.job_service = None
-        self._setup_scheduler()
 
         if app:
             self.init_app(app)
@@ -39,6 +38,9 @@ class JobScheduler:
         """Initialize scheduler with Flask app."""
         self.app = app
         self.job_service = JobService(db.session)
+
+        # Setup scheduler (creates BackgroundScheduler instance)
+        self._setup_scheduler()
 
         # Configure PostgreSQL jobstore using app's database URL
         database_url = app.config['SQLALCHEMY_DATABASE_URI']
@@ -54,32 +56,26 @@ class JobScheduler:
 
     def _setup_scheduler(self):
         """Setup the APScheduler instance."""
-        # Configure job stores (will be set in init_app with PostgreSQL)
-        jobstores = {
-            'default': None  # Will be configured in init_app
-        }
-        
         # Configure executors
         executors = {
             'default': ThreadPoolExecutor(max_workers=20),
             'high_priority': ThreadPoolExecutor(max_workers=10)
         }
-        
+
         # Configure job defaults
         job_defaults = {
             'coalesce': True,  # Only run the latest version of a job
             'max_instances': 3,  # Maximum 3 instances of a job can run simultaneously
             'misfire_grace_time': 300  # 5 minutes grace time for missed jobs
         }
-        
-        # Create scheduler
+
+        # Create scheduler without jobstores (will be added in init_app)
         self.scheduler = BackgroundScheduler(
-            jobstores=jobstores,
             executors=executors,
             job_defaults=job_defaults,
             timezone='UTC'
         )
-        
+
         # Add event listeners
         self.scheduler.add_listener(self._job_executed, EVENT_JOB_EXECUTED)
         self.scheduler.add_listener(self._job_error, EVENT_JOB_ERROR)
@@ -129,19 +125,22 @@ class JobScheduler:
             except Exception as e:
                 logger.error(f"Failed to load scheduled jobs: {e}")
     
-    def schedule_job(self, job_id: int, cron_expression: str, 
+    def schedule_job(self, job_id: int, cron_expression: str,
                     replace_existing: bool = True) -> bool:
         """
         Schedule a job to run based on cron expression.
-        
+
         Args:
             job_id: ID of the job to schedule
             cron_expression: Cron expression (e.g., '0 */6 * * *' for every 6 hours)
             replace_existing: Whether to replace existing job with same ID
-            
+
         Returns:
             True if scheduled successfully, False otherwise
         """
+        if not self.scheduler:
+            logger.error("Scheduler not initialized")
+            return False
         try:
             # Validate cron expression
             if not self._validate_cron_expression(cron_expression):
@@ -185,15 +184,18 @@ class JobScheduler:
                             replace_existing: bool = True) -> bool:
         """
         Schedule a job to run at regular intervals.
-        
+
         Args:
             job_id: ID of the job to schedule
             interval_minutes: Interval in minutes
             replace_existing: Whether to replace existing job with same ID
-            
+
         Returns:
             True if scheduled successfully, False otherwise
         """
+        if not self.scheduler:
+            logger.error("Scheduler not initialized")
+            return False
         try:
             # Get job details
             job = self._get_job(job_id)
@@ -228,13 +230,16 @@ class JobScheduler:
     def unschedule_job(self, job_id: int) -> bool:
         """
         Unschedule a job.
-        
+
         Args:
             job_id: ID of the job to unschedule
-            
+
         Returns:
             True if unscheduled successfully, False otherwise
         """
+        if not self.scheduler:
+            logger.error("Scheduler not initialized")
+            return False
         try:
             job_name = f"job_{job_id}"
             self.scheduler.remove_job(job_name)
@@ -251,6 +256,8 @@ class JobScheduler:
     
     def get_scheduled_jobs(self) -> List[Dict[str, Any]]:
         """Get list of all scheduled jobs."""
+        if not self.scheduler:
+            return []
         jobs = []
         for job in self.scheduler.get_jobs():
             job_info = {
@@ -265,6 +272,8 @@ class JobScheduler:
     
     def get_job_status(self, job_id: int) -> Optional[Dict[str, Any]]:
         """Get status of a scheduled job."""
+        if not self.scheduler:
+            return {'scheduled': False}
         job_name = f"job_{job_id}"
         try:
             job = self.scheduler.get_job(job_name)

@@ -24,8 +24,20 @@ from app.agents.types.rss_agent import RSSAgent
 from app.agents.types.web_fetch_agent import WebFetchAgent
 from app.agents.types.scheduler_agent import SchedulerAgent
 
+# Import transform agents
+from app.agents.types.filter_agent import FilterAgent
+from app.agents.types.deduplication_agent import DeduplicationAgent
+from app.agents.types.html_parser_agent import HTMLParserAgent
+from app.agents.types.template_agent import TemplateAgent
+
 __all__ = [
+    # Source agents
     'RSSAgent',
     'WebFetchAgent',
     'SchedulerAgent',
+    # Transform agents
+    'FilterAgent',
+    'DeduplicationAgent',
+    'HTMLParserAgent',
+    'TemplateAgent',
 ]

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.extensions import db
 from app.services.job_service import JobService
+from app.services.agent_service import AgentService
 from app.jobs.enums import JobStatus
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class JobScheduler:
         self.app = app
         self.scheduler = None
         self.job_service = None
+        self.agent_service = None
 
         if app:
             self.init_app(app)
@@ -38,6 +40,7 @@ class JobScheduler:
         """Initialize scheduler with Flask app."""
         self.app = app
         self.job_service = JobService(db.session)
+        self.agent_service = AgentService(db.session)
 
         # Setup scheduler (creates BackgroundScheduler instance)
         self._setup_scheduler()
@@ -295,22 +298,60 @@ class JobScheduler:
         """Create a job function that executes the job."""
         def execute_scheduled_job():
             try:
-                logger.info(f"Executing scheduled job {job_id}")
+                logger.info(f"Executing scheduled job/agent {job_id}")
 
-                # Execute with internal flag to bypass ownership check
-                job_run, error = self.job_service.execute_job(
-                    job_id,
-                    user_id=None,
-                    internal=True  # Mark as internal/scheduler execution
-                )
+                # Check if this is an agent type (new system) or old job type
+                job = self._get_job(job_id)
+                if not job:
+                    logger.error(f"Job/Agent {job_id} not found")
+                    return
 
-                if error:
-                    logger.error(f"Scheduled job {job_id} failed: {error}")
+                # Check if this is an agent type (registered in agent registry)
+                from app.agents.registry import agent_registry
+                is_agent = False
+                try:
+                    agent_class = agent_registry.get_agent_class(job.job_type)
+                    is_agent = agent_class.can_be_scheduled
+                except ValueError:
+                    # Not an agent type, use old job system
+                    is_agent = False
+
+                if is_agent:
+                    # Use new agent system
+                    result = self.agent_service.run_agent(
+                        agent_id=job_id,
+                        manual=False,
+                        propagate=True  # Auto-propagate events
+                    )
+
+                    if result['success']:
+                        logger.info(
+                            f"Scheduled agent {job_id} completed successfully, "
+                            f"created {result.get('events_created', 0)} events"
+                        )
+                        if 'propagation_stats' in result:
+                            stats = result['propagation_stats']
+                            logger.info(
+                                f"Event propagation: {stats['events_propagated']} events propagated, "
+                                f"{stats['agents_executed']} agents executed"
+                            )
+                    else:
+                        logger.error(f"Scheduled agent {job_id} failed: {result.get('error', 'Unknown error')}")
                 else:
-                    logger.info(f"Scheduled job {job_id} completed successfully")
+                    # Use old job system
+                    job_run, error = self.job_service.execute_job(
+                        job_id,
+                        user_id=None,
+                        internal=True  # Mark as internal/scheduler execution
+                    )
+
+                    if error:
+                        logger.error(f"Scheduled job {job_id} failed: {error}")
+                    else:
+                        logger.info(f"Scheduled job {job_id} completed successfully")
 
             except Exception as e:
-                logger.error(f"Error executing scheduled job {job_id}: {e}")
+                logger.error(f"Error executing scheduled job/agent {job_id}: {e}", exc_info=True)
 
         return execute_scheduled_job
     

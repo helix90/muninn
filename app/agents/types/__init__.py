@@ -11,11 +11,10 @@ Transform Agents:
 - DeduplicationAgent: Remove duplicates
 - HTMLParserAgent: Parse HTML via CSS selectors
 - TemplateAgent: Transform via Jinja2
-- DigestAgent: Batch events
 
 Action Agents:
 - EmailAgent: Send via SMTP
-- HTTPPostAgent: POST to URL
+- HTTPPostAgent: POST/PUT/PATCH/DELETE to URL
 - JabberAgent: XMPP messaging
 """
 
@@ -30,6 +29,11 @@ from app.agents.types.deduplication_agent import DeduplicationAgent
 from app.agents.types.html_parser_agent import HTMLParserAgent
 from app.agents.types.template_agent import TemplateAgent
 
+# Import action agents
+from app.agents.types.email_agent import EmailAgent
+from app.agents.types.http_post_agent import HTTPPostAgent
+from app.agents.types.jabber_agent import JabberAgent
+
 __all__ = [
     # Source agents
     'RSSAgent',
@@ -40,4 +44,8 @@ __all__ = [
     'DeduplicationAgent',
     'HTMLParserAgent',
     'TemplateAgent',
+    # Action agents
+    'EmailAgent',
+    'HTTPPostAgent',
+    'JabberAgent',
 ]

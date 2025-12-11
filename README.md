@@ -9,6 +9,13 @@ Muninn is a modern, intelligent automation platform built with Flask, designed t
 
 ## 🚀 Features
 
+- **Agent-Based Automation**: Huginn-inspired single-responsibility agents with event-driven workflows
+- **Composable Workflows**: Build complex automations from simple, reusable agents
+- **Source Agents**: Fetch data from RSS feeds, web pages, APIs, and more
+- **Transform Agents**: Filter, deduplicate, parse, and transform data
+- **Action Agents**: Send emails, HTTP requests, messages, and notifications
+- **Event Propagation**: Automatic event flow through agent networks
+- **Agent Memory**: Persistent state for deduplication and stateful processing
 - **Modern Flask Architecture**: Built with Flask 3.0+ using the application factory pattern
 - **Environment-Based Configuration**: Separate configurations for development, testing, and production
 - **Comprehensive Testing**: Full test suite with pytest and coverage reporting
@@ -141,6 +148,97 @@ python run.py
 
 The application will be available at `http://0.0.0.0:5000` (accessible from any network interface)
 
+## 🤖 Agent System
+
+Muninn uses a Huginn-inspired agent architecture where each agent performs a single, well-defined task. Agents connect together to create powerful automation workflows.
+
+### Agent Types
+
+**Source Agents** - Fetch data from external sources:
+- **RSSAgent**: Monitor RSS/Atom feeds
+- **WebFetchAgent**: Fetch web pages via HTTP
+- **SchedulerAgent**: Generate time-based triggers
+
+**Transform Agents** - Process and transform data:
+- **FilterAgent**: Filter events by rules (contains, regex, etc.)
+- **DeduplicationAgent**: Remove duplicate events using memory
+- **HTMLParserAgent**: Extract data from HTML via CSS selectors
+- **JSONExtractAgent**: Extract data from JSON via JSONPath
+- **TemplateAgent**: Transform data using Jinja2 templates
+- **DigestAgent**: Batch multiple events into summaries
+
+**Action Agents** - Perform terminal actions:
+- **EmailAgent**: Send emails via SMTP
+- **HTTPPostAgent**: Send HTTP POST/PUT/PATCH requests
+- **JabberAgent**: Send XMPP/Jabber messages
+
+### Quick Example: News Monitor
+
+Monitor Hacker News for Python articles and send email notifications:
+
+```python
+# 1. RSS Agent - Fetch Hacker News (runs every 30 minutes)
+rss_agent = Job(
+    name='Hacker News RSS',
+    job_type='rss_agent',
+    config={'feed_url': 'https://hnrss.org/newest', 'max_entries': 50},
+    schedule='*/30 * * * *'
+)
+
+# 2. Filter Agent - Keep only Python articles
+filter_agent = Job(
+    name='Python Filter',
+    job_type='filter_agent',
+    config={
+        'rules': [
+            {'field': 'title', 'type': 'contains', 'value': 'Python', 'case_sensitive': False}
+        ]
+    }
+)
+
+# 3. Deduplication Agent - Remove duplicates (7 day window)
+dedupe_agent = Job(
+    name='Deduplicator',
+    job_type='deduplication_agent',
+    config={'uniqueness_fields': ['link'], 'lookback_days': 7}
+)
+
+# 4. Email Agent - Send notifications
+email_agent = Job(
+    name='Email Notifier',
+    job_type='email_agent',
+    config={
+        'smtp_server': 'smtp.gmail.com',
+        'smtp_port': 587,
+        'username': 'alerts@example.com',
+        'password': 'app_password',
+        'subject_template': 'New Python Article: {{ title }}',
+        'body_template': '{{ title }}\n\n{{ link }}\n\n{{ summary }}'
+    }
+)
+
+# 5. Connect agents: RSS → Filter → Dedupe → Email
+AgentLink(source_agent_id=rss_agent.id, target_agent_id=filter_agent.id)
+AgentLink(source_agent_id=filter_agent.id, target_agent_id=dedupe_agent.id)
+AgentLink(source_agent_id=dedupe_agent.id, target_agent_id=email_agent.id)
+```
+
+### How Events Flow
+
+1. **RSS Agent** runs every 30 minutes, creates events for each article
+2. **Filter Agent** receives events, filters for Python articles
+3. **Deduplication Agent** checks memory, only passes new articles
+4. **Email Agent** sends notification email
+
+### Learn More
+
+See [AGENTS_FRAMEWORK.md](AGENTS_FRAMEWORK.md) for:
+- Complete agent documentation
+- Configuration examples
+- Building custom agents
+- Advanced workflow patterns
+- API reference
+
 ## 🌐 Remote Development
 
 Muninn is configured for remote development by default:
@@ -186,10 +284,12 @@ flask create-user --username admin --email admin@example.com --password securepa
 
 The application includes comprehensive data models:
 
-- **User**: Authentication and job ownership
-- **Job**: Automation workflow definitions
-- **JobRun**: Job execution tracking
-- **JobChain**: Job dependencies and workflows
+- **User**: Authentication and agent ownership
+- **Job**: Agent definitions (agent_type, config, schedule)
+- **JobRun**: Agent execution tracking with input/output events
+- **Event**: Event data flowing between agents (payload, metadata)
+- **AgentLink**: Connections between agents (source → target)
+- **AgentMemory**: Persistent agent state for deduplication and stateful processing
 
 ### Migrations
 

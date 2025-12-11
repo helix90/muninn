@@ -274,6 +274,39 @@ class JobRun(db.Model):
         return f'<JobRun {self.id} - {job_name} ({self.status})>'
 
 
+class AgentRun(db.Model):
+    """AgentRun model for tracking agent execution."""
+
+    __tablename__ = 'agent_runs'
+
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(Integer, ForeignKey('jobs.id'), nullable=False, index=True)
+    status = Column(String(50), nullable=False, index=True, default='pending')
+    started_at = Column(DateTime, default=func.now(), nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    manual = Column(Boolean, default=False, nullable=False)
+    input_event_ids = Column(JSON, nullable=True, default=list)
+    output_event_ids = Column(JSON, nullable=True, default=list)
+
+    # Relationships
+    agent = relationship('Job', foreign_keys=[agent_id], backref='agent_runs')
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'running', 'completed', 'failed')",
+            name='valid_agent_run_status'
+        ),
+        Index('idx_agent_runs_agent_status', 'agent_id', 'status'),
+        Index('idx_agent_runs_started_at', 'started_at'),
+    )
+
+    def __repr__(self):
+        agent_name = self.agent.name if self.agent else f"Agent({self.agent_id})"
+        return f'<AgentRun {self.id} - {agent_name} ({self.status})>'
+
+
 class JobChain(db.Model):
     """JobChain model for defining job dependencies and workflows."""
     

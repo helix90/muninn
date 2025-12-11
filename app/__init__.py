@@ -27,12 +27,14 @@ def create_app(config_name=None):
     # Register blueprints
     from app.main import main as main_blueprint
     from app.jobs.views import jobs as jobs_blueprint
+    from app.agents.views import agents as agents_blueprint
     from app.scheduler import scheduler_bp as scheduler_blueprint
     from app.auth import auth as auth_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(jobs_blueprint)
+    app.register_blueprint(agents_blueprint)
     app.register_blueprint(scheduler_blueprint)
     
     # Register CLI commands

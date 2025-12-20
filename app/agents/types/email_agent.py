@@ -133,15 +133,12 @@ class EmailAgent(ActionAgent):
             if not isinstance(self.config['html'], bool):
                 raise ValueError("'html' must be a boolean")
 
-    def process(self, events: List[Event]) -> List[Event]:
+    def act(self, events: List[Event]) -> None:
         """
         Send emails for each event.
 
         Args:
             events: Events to process
-
-        Returns:
-            Empty list (terminal agent does not create events)
         """
         smtp_server = self.config['smtp_server']
         smtp_port = self.config.get('smtp_port', 587)
@@ -221,9 +218,6 @@ class EmailAgent(ActionAgent):
             'sent_count': sent_count,
             'failed_count': failed_count
         })
-
-        # Terminal agent: return empty list
-        return []
 
     def _render_template(self, template_str: str, data: Dict[str, Any]) -> str:
         """

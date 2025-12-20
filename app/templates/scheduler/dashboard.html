@@ -6,9 +6,9 @@
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-900">Scheduler Dashboard</h1>
-        <a href="{{ url_for('jobs.job_list') }}" 
+        <a href="{{ url_for('agents.agent_list') }}"
            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            Manage Jobs
+            Manage Agents
         </a>
     </div>
 
@@ -70,7 +70,7 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <div class="text-sm font-medium text-gray-900">
-                                    <a href="{{ url_for('jobs.job_detail', job_id=job.id) }}" 
+                                    <a href="{{ url_for('agents.agent_detail', agent_id=job.id) }}"
                                        class="text-blue-600 hover:text-blue-900">
                                         {{ job.name }}
                                     </a>
@@ -137,9 +137,9 @@
             </div>
             <h3 class="text-lg font-medium text-gray-900 mb-2">No scheduled jobs</h3>
             <p class="text-gray-500 mb-6">Schedule your jobs to run automatically at specified times.</p>
-            <a href="{{ url_for('jobs.job_list') }}" 
+            <a href="{{ url_for('agents.agent_list') }}"
                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                View Jobs
+                View Agents
             </a>
         </div>
         {% endif %}

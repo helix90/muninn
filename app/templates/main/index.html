@@ -20,9 +20,9 @@
                               d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Create Job</h3>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Create Agent</h3>
                 <p class="text-gray-600 mb-4">Set up a new automation workflow</p>
-                <a href="{{ url_for('jobs.create_job') }}" 
+                <a href="{{ url_for('agents.create_agent') }}"
                    class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                     Get Started
                 </a>
@@ -35,9 +35,9 @@
                               d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">View Jobs</h3>
-                <p class="text-gray-600 mb-4">Monitor and manage your jobs</p>
-                <a href="{{ url_for('jobs.job_list') }}" 
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">View Agents</h3>
+                <p class="text-gray-600 mb-4">Monitor and manage your agents</p>
+                <a href="{{ url_for('agents.agent_list') }}"
                    class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
                     View All
                 </a>
@@ -50,9 +50,9 @@
                               d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Execute Jobs</h3>
-                <p class="text-gray-600 mb-4">Run jobs on demand</p>
-                <a href="{{ url_for('jobs.job_list') }}" 
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Execute Agents</h3>
+                <p class="text-gray-600 mb-4">Run agents on demand</p>
+                <a href="{{ url_for('agents.agent_list') }}"
                    class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
                     Run Now
                 </a>
@@ -145,9 +145,9 @@
                 </div>
             </div>
             <div class="text-center mt-6">
-                <a href="{{ url_for('jobs.create_job') }}" 
+                <a href="{{ url_for('agents.create_agent') }}"
                    class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
-                    Create Your First Job
+                    Create Your First Agent
                 </a>
             </div>
         </div>

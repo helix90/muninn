@@ -29,7 +29,12 @@ class Config:
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    
+
+    # Scheduler configuration (Thundering Herd Prevention)
+    SCHEDULER_JITTER_MIN_SECONDS = env_config('SCHEDULER_JITTER_MIN', default=0, cast=int)
+    SCHEDULER_JITTER_MAX_SECONDS = env_config('SCHEDULER_JITTER_MAX', default=60, cast=int)
+    SCHEDULER_MAX_STARTS_PER_SECOND = env_config('SCHEDULER_MAX_STARTS_PER_SEC', default=5, cast=int)
+
     @staticmethod
     def init_app(app):
         """Initialize application with configuration."""
@@ -70,10 +75,11 @@ class TestingConfig(Config):
     DATABASE_URL = env_config('TEST_DATABASE_URL', default='postgresql://muninn:muninn_pass@localhost:5432/muninn_test')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 1,
-        'pool_timeout': 5,
+        'pool_size': 20,          # Increased for concurrent test execution
+        'pool_timeout': 30,       # Increased timeout for concurrent tests
         'pool_recycle': 300,
-        'max_overflow': 0,
+        'max_overflow': 10,       # Allow more overflow connections
+        'pool_pre_ping': True,    # Test connections before using
     }
 
 

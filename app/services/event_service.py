@@ -5,8 +5,10 @@ Handles propagation of events through agent networks.
 Events flow from source agents → transform agents → action agents.
 """
 
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
+from datetime import datetime
 import logging
+from sqlalchemy import cast, String
 from app.models import Event, AgentLink
 from app.extensions import db
 
@@ -149,7 +151,7 @@ class EventService:
 
                         # Recursively propagate new events
                         new_visited = visited_agent_ids.copy()
-                        new_visited.add(source_agent_id)
+                        new_visited.add(target_agent_id)  # Add the target agent we just executed
 
                         self._propagate_recursive(
                             events=new_events,
@@ -233,11 +235,17 @@ class EventService:
 
         # Execute agent with events
         try:
-            new_events = agent.process(events)
+            new_events = agent.check(events)
 
-            # Persist new events to database
+            # Update agent_id for all returned events to reflect the processing agent
+            # and persist new events to database
             if new_events:
                 for event in new_events:
+                    # Update the agent_id to the current agent
+                    event.agent_id = agent_model.id
+                    event.agent_type = agent_model.job_type
+
+                    # Add to session (will update if exists, insert if new)
                     self.db_session.add(event)
                 self.db_session.commit()
 
@@ -338,3 +346,183 @@ class EventService:
             return False, "Link already exists"
 
         return True, ""
+
+    def get_events_for_agent(
+        self,
+        agent_id: int,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        payload_search: Optional[str] = None
+    ) -> List[Event]:
+        """
+        Get events for a specific agent with optional filtering.
+
+        Args:
+            agent_id: ID of the agent
+            limit: Maximum number of events to return (None = all)
+            offset: Number of events to skip (for pagination)
+            start_date: Filter events after this date
+            end_date: Filter events before this date
+            payload_search: Text to search for in payload JSON
+
+        Returns:
+            List of Event objects
+        """
+        query = self.db_session.query(Event).filter(Event.agent_id == agent_id)
+
+        # Apply date filters
+        if start_date:
+            query = query.filter(Event.created_at >= start_date)
+        if end_date:
+            query = query.filter(Event.created_at <= end_date)
+
+        # Apply payload search (search within JSON payload)
+        if payload_search:
+            query = query.filter(cast(Event.payload, String).contains(payload_search))
+
+        # Order by most recent first
+        query = query.order_by(Event.created_at.desc())
+
+        # Apply pagination
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+
+        return query.all()
+
+    def count_events_for_agent(
+        self,
+        agent_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        payload_search: Optional[str] = None
+    ) -> int:
+        """
+        Count events for a specific agent with optional filtering.
+
+        Args:
+            agent_id: ID of the agent
+            start_date: Filter events after this date
+            end_date: Filter events before this date
+            payload_search: Text to search for in payload JSON
+
+        Returns:
+            Count of matching events
+        """
+        query = self.db_session.query(Event).filter(Event.agent_id == agent_id)
+
+        # Apply date filters
+        if start_date:
+            query = query.filter(Event.created_at >= start_date)
+        if end_date:
+            query = query.filter(Event.created_at <= end_date)
+
+        # Apply payload search
+        if payload_search:
+            query = query.filter(cast(Event.payload, String).contains(payload_search))
+
+        return query.count()
+
+    def get_all_events(
+        self,
+        user_id: int,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        agent_type: Optional[str] = None,
+        agent_id: Optional[int] = None,
+        payload_search: Optional[str] = None
+    ) -> List[Event]:
+        """
+        Get all events for a user with comprehensive filtering.
+
+        Args:
+            user_id: ID of the user
+            limit: Maximum number of events to return
+            offset: Number of events to skip
+            start_date: Filter events after this date
+            end_date: Filter events before this date
+            agent_type: Filter by agent type (rss_agent, filter_agent, etc.)
+            agent_id: Filter by specific agent ID
+            payload_search: Text to search for in payload JSON
+
+        Returns:
+            List of Event objects
+        """
+        # SECURITY: Filter by user_id to enforce data isolation
+        query = self.db_session.query(Event).filter(Event.user_id == user_id)
+
+        # Apply agent filters
+        if agent_type:
+            query = query.filter(Event.agent_type == agent_type)
+        if agent_id:
+            query = query.filter(Event.agent_id == agent_id)
+
+        # Apply date filters
+        if start_date:
+            query = query.filter(Event.created_at >= start_date)
+        if end_date:
+            query = query.filter(Event.created_at <= end_date)
+
+        # Apply payload search
+        if payload_search:
+            query = query.filter(cast(Event.payload, String).contains(payload_search))
+
+        # Order by most recent first
+        query = query.order_by(Event.created_at.desc())
+
+        # Apply pagination
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+
+        return query.all()
+
+    def count_all_events(
+        self,
+        user_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        agent_type: Optional[str] = None,
+        agent_id: Optional[int] = None,
+        payload_search: Optional[str] = None
+    ) -> int:
+        """
+        Count all events for a user with comprehensive filtering.
+
+        Args:
+            user_id: ID of the user
+            start_date: Filter events after this date
+            end_date: Filter events before this date
+            agent_type: Filter by agent type
+            agent_id: Filter by specific agent ID
+            payload_search: Text to search for in payload JSON
+
+        Returns:
+            Count of matching events
+        """
+        # SECURITY: Filter by user_id to enforce data isolation
+        query = self.db_session.query(Event).filter(Event.user_id == user_id)
+
+        # Apply agent filters
+        if agent_type:
+            query = query.filter(Event.agent_type == agent_type)
+        if agent_id:
+            query = query.filter(Event.agent_id == agent_id)
+
+        # Apply date filters
+        if start_date:
+            query = query.filter(Event.created_at >= start_date)
+        if end_date:
+            query = query.filter(Event.created_at <= end_date)
+
+        # Apply payload search
+        if payload_search:
+            query = query.filter(cast(Event.payload, String).contains(payload_search))
+
+        return query.count()

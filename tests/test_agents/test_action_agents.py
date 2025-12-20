@@ -32,8 +32,8 @@ def test_job(app_context):
     # Create a test job
     job = Job(
         name='Test Agent',
-        job_type='web_scraper',  # Use existing job type
-        config={},
+        job_type='rss_agent',  # Use valid agent type
+        config={'feed_url': 'https://example.com/feed.xml'},
         user_id=user.id
     )
     db.session.add(job)
@@ -298,7 +298,7 @@ def test_email_agent_sends_email(mock_smtp, test_job, db_session, sample_events)
     mock_smtp.return_value.__enter__.return_value = mock_server
 
     # Process events
-    result = agent.process(sample_events)
+    result = agent.check(sample_events)
 
     # Should return empty list (terminal agent)
     assert result == []
@@ -337,7 +337,7 @@ def test_email_agent_template_rendering(mock_smtp, test_job, db_session, sample_
     mock_smtp.return_value.__enter__.return_value = mock_server
 
     # Process first event
-    result = agent.process([sample_events[0]])
+    result = agent.check([sample_events[0]])
 
     assert result == []
 
@@ -378,7 +378,7 @@ def test_email_agent_multiple_recipients(mock_smtp, test_job, db_session, sample
     mock_smtp.return_value.__enter__.return_value = mock_server
 
     # Process first event
-    result = agent.process([sample_events[0]])
+    result = agent.check([sample_events[0]])
 
     assert result == []
     assert mock_server.send_message.call_count == 1
@@ -408,7 +408,7 @@ def test_email_agent_error_handling(mock_smtp, test_job, db_session, sample_even
     mock_smtp.return_value.__enter__.side_effect = smtplib.SMTPException("Connection failed")
 
     # Process events - should not raise exception
-    result = agent.process(sample_events)
+    result = agent.check(sample_events)
 
     # Should still return empty list
     assert result == []
@@ -558,7 +558,7 @@ def test_http_post_agent_sends_request(mock_post, test_job, db_session, sample_e
     mock_post.return_value = mock_response
 
     # Process events
-    result = agent.process(sample_events)
+    result = agent.check(sample_events)
 
     # Should return empty list (terminal agent)
     assert result == []
@@ -602,7 +602,7 @@ def test_http_post_agent_template_rendering(mock_post, test_job, db_session, sam
     mock_post.return_value = mock_response
 
     # Process first event
-    result = agent.process([sample_events[0]])
+    result = agent.check([sample_events[0]])
 
     assert result == []
 
@@ -642,7 +642,7 @@ def test_http_post_agent_different_methods(mock_put, test_job, db_session, sampl
     mock_put.return_value = mock_response
 
     # Process first event
-    result = agent.process([sample_events[0]])
+    result = agent.check([sample_events[0]])
 
     assert result == []
     assert mock_put.call_count == 1
@@ -666,7 +666,7 @@ def test_http_post_agent_error_handling(mock_post, test_job, db_session, sample_
     mock_post.side_effect = requests.exceptions.Timeout("Connection timeout")
 
     # Process events - should not raise exception
-    result = agent.process(sample_events)
+    result = agent.check(sample_events)
 
     # Should still return empty list
     assert result == []
@@ -851,103 +851,97 @@ def test_jabber_agent_library_not_available(test_job, db_session, sample_events)
             )
 
 
-@patch('app.agents.types.jabber_agent.slixmpp')
-def test_jabber_agent_sends_message(mock_slixmpp, test_job, db_session, sample_events):
+def test_jabber_agent_sends_message(test_job, db_session, sample_events):
     """Test JabberAgent sends XMPP messages successfully."""
     # Skip if slixmpp not available
-    try:
-        import slixmpp
-    except ImportError:
-        pytest.skip("slixmpp not installed")
+    slixmpp = pytest.importorskip("slixmpp")
 
-    config = {
-        'jid': 'bot@jabber.example.com',
-        'password': 'password',
-        'recipient': 'admin@jabber.example.com',
-        'message_template': '{{ title }}: {{ message }}'
-    }
+    from unittest.mock import patch
+    with patch('app.agents.types.jabber_agent.slixmpp') as mock_slixmpp:
+        config = {
+            'jid': 'bot@jabber.example.com',
+            'password': 'password',
+            'recipient': 'admin@jabber.example.com',
+            'message_template': '{{ title }}: {{ message }}'
+        }
 
-    agent = JabberAgent(
-        agent_id=test_job.id,
-        config=config,
-        user_id=test_job.user_id,
-        db_session=db_session
-    )
+        agent = JabberAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
 
-    # Mock XMPP client
-    mock_client = MagicMock()
-    mock_client.message_sent = True
-    mock_slixmpp.ClientXMPP.return_value = mock_client
+        # Mock XMPP client
+        mock_client = MagicMock()
+        mock_client.message_sent = True
+        mock_slixmpp.ClientXMPP.return_value = mock_client
 
-    # Process events
-    result = agent.process(sample_events)
+        # Process events
+        result = agent.check(sample_events)
 
-    # Should return empty list (terminal agent)
-    assert result == []
+        # Should return empty list (terminal agent)
+        assert result == []
 
 
-@patch('app.agents.types.jabber_agent.slixmpp')
-def test_jabber_agent_template_rendering(mock_slixmpp, test_job, db_session, sample_events):
+def test_jabber_agent_template_rendering(test_job, db_session, sample_events):
     """Test JabberAgent renders templates correctly."""
     # Skip if slixmpp not available
-    try:
-        import slixmpp
-    except ImportError:
-        pytest.skip("slixmpp not installed")
+    slixmpp = pytest.importorskip("slixmpp")
 
-    config = {
-        'jid': 'bot@jabber.example.com',
-        'password': 'password',
-        'recipient': '{{ priority }}@jabber.example.com',
-        'message_template': '[{{ priority|upper }}] {{ title }}: {{ message }}'
-    }
+    from unittest.mock import patch
+    with patch('app.agents.types.jabber_agent.slixmpp') as mock_slixmpp:
+        config = {
+            'jid': 'bot@jabber.example.com',
+            'password': 'password',
+            'recipient': '{{ priority }}@jabber.example.com',
+            'message_template': '[{{ priority|upper }}] {{ title }}: {{ message }}'
+        }
 
-    agent = JabberAgent(
-        agent_id=test_job.id,
-        config=config,
-        user_id=test_job.user_id,
-        db_session=db_session
-    )
+        agent = JabberAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
 
-    # Mock XMPP client
-    mock_client = MagicMock()
-    mock_client.message_sent = True
-    mock_slixmpp.ClientXMPP.return_value = mock_client
+        # Mock XMPP client
+        mock_client = MagicMock()
+        mock_client.message_sent = True
+        mock_slixmpp.ClientXMPP.return_value = mock_client
 
-    # Process first event
-    result = agent.process([sample_events[0]])
+        # Process first event
+        result = agent.check([sample_events[0]])
 
-    assert result == []
+        assert result == []
 
 
-@patch('app.agents.types.jabber_agent.slixmpp')
-def test_jabber_agent_error_handling(mock_slixmpp, test_job, db_session, sample_events):
+def test_jabber_agent_error_handling(test_job, db_session, sample_events):
     """Test JabberAgent handles errors gracefully."""
     # Skip if slixmpp not available
-    try:
-        import slixmpp
-    except ImportError:
-        pytest.skip("slixmpp not installed")
+    slixmpp = pytest.importorskip("slixmpp")
 
-    config = {
-        'jid': 'bot@jabber.example.com',
-        'password': 'password',
-        'recipient': 'admin@jabber.example.com',
-        'message_template': '{{ message }}'
-    }
+    from unittest.mock import patch
+    with patch('app.agents.types.jabber_agent.slixmpp') as mock_slixmpp:
+        config = {
+            'jid': 'bot@jabber.example.com',
+            'password': 'password',
+            'recipient': 'admin@jabber.example.com',
+            'message_template': '{{ message }}'
+        }
 
-    agent = JabberAgent(
-        agent_id=test_job.id,
-        config=config,
-        user_id=test_job.user_id,
-        db_session=db_session
-    )
+        agent = JabberAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
 
-    # Mock XMPP client to raise error
-    mock_slixmpp.ClientXMPP.side_effect = Exception("Connection failed")
+        # Mock XMPP client to raise error
+        mock_slixmpp.ClientXMPP.side_effect = Exception("Connection failed")
 
-    # Process events - should not raise exception
-    result = agent.process(sample_events)
+        # Process events - should not raise exception
+        result = agent.check(sample_events)
 
-    # Should still return empty list
-    assert result == []
+        # Should still return empty list
+        assert result == []

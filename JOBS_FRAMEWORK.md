@@ -220,6 +220,102 @@ runs = service.get_job_runs(job_id=1, user_id=1)
 stats = service.get_job_statistics(user_id=1)
 ```
 
+## Scheduler Thundering Herd Prevention
+
+The Muninn scheduler implements automatic protection against the "Thundering Herd" problem, where many jobs with identical cron schedules fire simultaneously and overwhelm the system.
+
+### Automatic Jitter
+
+Every cron-scheduled job gets an automatic random delay (jitter) of 0-60 seconds before execution:
+
+- **Deterministic**: The same job always gets the same offset within each hour (based on `hash((job_id, current_hour))`)
+- **Transparent**: Users don't need to configure anything - jitter is applied automatically
+- **Spread Load**: 100 jobs scheduled at "0 * * * *" will execute gradually between HH:00:00 and HH:01:00, not all at once
+
+**Example Impact:**
+```
+Without jitter: 100 jobs at 12:00:00 → System overload
+With jitter:    100 jobs spread across 12:00:00 - 12:01:00 → Smooth load
+```
+
+### Global Rate Limiting
+
+The scheduler enforces a global rate limit on job starts to prevent system overload:
+
+- **Default Limit**: 5 job starts per second (configurable)
+- **Token Bucket Algorithm**: Smooth rate limiting with automatic token refill
+- **Thread-Safe**: Concurrent job starts are safely coordinated
+- **Queuing**: Jobs wait for available slots rather than failing
+
+**How It Works:**
+1. APScheduler triggers job at scheduled time
+2. Job waits for jitter delay (0-60 seconds, deterministic)
+3. Job acquires rate limit token (may wait if limit reached)
+4. Job executes
+
+### Configuration
+
+Configure Thundering Herd prevention behavior via environment variables or `config.py`:
+
+```python
+# Jitter configuration
+SCHEDULER_JITTER_MIN_SECONDS = 0      # Minimum jitter delay (default: 0)
+SCHEDULER_JITTER_MAX_SECONDS = 60     # Maximum jitter delay (default: 60)
+
+# Rate limiting
+SCHEDULER_MAX_STARTS_PER_SECOND = 5   # Max job starts per second (default: 5)
+```
+
+**Environment Variables:**
+```bash
+SCHEDULER_JITTER_MIN=0
+SCHEDULER_JITTER_MAX=60
+SCHEDULER_MAX_STARTS_PER_SEC=5
+```
+
+### Benefits
+
+- **System Stability**: Prevents thread pool saturation during scheduled peaks
+- **Predictable Performance**: Smooth resource utilization instead of spiky loads
+- **Automatic Protection**: No user action required - works for all cron jobs
+- **Scalable**: Handles hundreds of synchronized schedules without degradation
+
+### Implementation Details
+
+The Thundering Herd prevention is implemented in `app/scheduler/scheduler.py:execute_scheduled_job()`:
+
+```python
+# STEP 1: Apply jitter (0-60 seconds, deterministic per job+hour)
+current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+seed_value = hash((job_id, current_hour))
+random.seed(seed_value)
+jitter_seconds = random.uniform(jitter_min, jitter_max)
+time.sleep(jitter_seconds)
+
+# STEP 2: Acquire rate limit token
+_rate_limiter.acquire()  # Blocks until token available
+
+# STEP 3: Execute job
+result = agent_service.run_agent(...)
+```
+
+### Testing
+
+Comprehensive tests verify Thundering Herd prevention:
+
+```bash
+# Run scheduler jitter tests
+pytest tests/test_scheduler_jitter.py -v
+```
+
+Test coverage includes:
+- Rate limiter token bucket algorithm
+- Token refill and rate enforcement
+- Thread safety under concurrent access
+- Jitter application and determinism
+- Configuration respect
+- Integration scenarios
+
 ## Web Interface
 
 The job framework provides a comprehensive web interface:

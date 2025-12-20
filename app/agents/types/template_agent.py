@@ -6,7 +6,7 @@ Does NOT fetch or filter data.
 """
 
 from typing import List, Dict, Any
-from jinja2 import Template, TemplateSyntaxError, UndefinedError
+from jinja2 import Template, TemplateSyntaxError, UndefinedError, Environment
 from app.agents.base import TransformAgent
 from app.agents.registry import register_agent
 from app.models import Event
@@ -172,7 +172,11 @@ class TemplateAgent(TransformAgent):
             Rendered template string
         """
         try:
-            template = Template(template_str)
+            # Create environment with proper finalize function
+            # This prevents None from being converted to 'None' string,
+            # allowing default() filter to work correctly
+            env = Environment(finalize=lambda x: x if x is not None else '')
+            template = env.from_string(template_str)
             return template.render(**data)
         except UndefinedError as e:
             # Handle undefined variables gracefully

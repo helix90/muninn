@@ -130,8 +130,8 @@ class TestJobModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -139,8 +139,8 @@ class TestJobModel:
         
         assert job.id is not None
         assert job.name == 'Test Job'
-        assert job.job_type == 'web_scraper'
-        assert job.config == {'url': 'http://example.com', 'selectors': {'title': 'h1'}}
+        assert job.job_type == 'rss_agent'
+        assert job.config == {'feed_url': 'http://example.com/feed'}
         assert job.user_id == user.id
         assert job.is_active is True
         assert job.created_at is not None
@@ -160,7 +160,7 @@ class TestJobModel:
         with pytest.raises(ValueError, match="Config must be a dictionary"):
             job = Job(
                 name='Test Job',
-                job_type='web_scraper',
+                job_type='rss_agent',
                 config='not_a_dict',
                 user_id=user.id
             )
@@ -180,8 +180,8 @@ class TestJobModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -211,11 +211,11 @@ class TestJobModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
-        assert repr(job) == '<Job Test Job (web_scraper)>'
+        assert repr(job) == '<Job Test Job (rss_agent)>'
 
 
 class TestJobRunModel:
@@ -234,8 +234,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -270,8 +270,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -298,8 +298,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -327,8 +327,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -358,8 +358,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -389,8 +389,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -424,8 +424,8 @@ class TestJobRunModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -454,14 +454,14 @@ class TestJobChainModel:
         
         parent_job = Job(
             name='Parent Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         child_job = Job(
             name='Child Job',
-            job_type='email_sender',
-            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'to_emails': ['test@example.com'], 'subject': 'Test', 'body': 'Test body'},
+            job_type='email_agent',
+            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'from_email': 'sender@example.com', 'to_email': 'test@example.com', 'subject_template': 'Test', 'body_template': 'Test body'},
             user_id=user.id
         )
         db.session.add_all([parent_job, child_job])
@@ -493,8 +493,8 @@ class TestJobChainModel:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -519,14 +519,14 @@ class TestJobChainModel:
         
         parent_job = Job(
             name='Parent Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         child_job = Job(
             name='Child Job',
-            job_type='email_sender',
-            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'to_emails': ['test@example.com'], 'subject': 'Test', 'body': 'Test body'},
+            job_type='email_agent',
+            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'from_email': 'sender@example.com', 'to_email': 'test@example.com', 'subject_template': 'Test', 'body_template': 'Test body'},
             user_id=user.id
         )
         db.session.add_all([parent_job, child_job])
@@ -554,14 +554,14 @@ class TestJobChainModel:
         
         parent_job = Job(
             name='Parent Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         child_job = Job(
             name='Child Job',
-            job_type='email_sender',
-            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'to_emails': ['test@example.com'], 'subject': 'Test', 'body': 'Test body'},
+            job_type='email_agent',
+            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'from_email': 'sender@example.com', 'to_email': 'test@example.com', 'subject_template': 'Test', 'body_template': 'Test body'},
             user_id=user.id
         )
         db.session.add_all([parent_job, child_job])
@@ -592,14 +592,14 @@ class TestJobChainModel:
         
         parent_job = Job(
             name='Parent Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         child_job = Job(
             name='Child Job',
-            job_type='email_sender',
-            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'to_emails': ['test@example.com'], 'subject': 'Test', 'body': 'Test body'},
+            job_type='email_agent',
+            config={'smtp_server': 'smtp.example.com', 'smtp_port': 587, 'username': 'user', 'password': 'pass', 'from_email': 'sender@example.com', 'to_email': 'test@example.com', 'subject_template': 'Test', 'body_template': 'Test body'},
             user_id=user.id
         )
         db.session.add_all([parent_job, child_job])
@@ -627,8 +627,8 @@ class TestModelConstraints:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)
@@ -659,8 +659,8 @@ class TestModelConstraints:
         
         job = Job(
             name='Test Job',
-            job_type='web_scraper',
-            config={'url': 'http://example.com', 'selectors': {'title': 'h1'}},
+            job_type='rss_agent',
+            config={'feed_url': 'http://example.com/feed'},
             user_id=user.id
         )
         db.session.add(job)

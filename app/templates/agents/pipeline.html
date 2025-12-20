@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Pipeline - Muninn{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Agent Pipeline Visualization</h1>
+        <p class="mt-2 text-sm text-gray-600">
+            Visual representation of your agent connections and event flow.
+        </p>
+    </div>
+
+    <!-- Graph Container -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div id="cy" class="w-full border border-gray-300 rounded" style="height: 600px;"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Legend</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-center">
+                <div class="w-5 h-5 rounded-full bg-green-500 mr-3"></div>
+                <span class="text-sm text-gray-700">Source Agent (creates events)</span>
+            </div>
+            <div class="flex items-center">
+                <div class="w-5 h-5 rounded-full bg-blue-500 mr-3"></div>
+                <span class="text-sm text-gray-700">Transform Agent (processes events)</span>
+            </div>
+            <div class="flex items-center">
+                <div class="w-5 h-5 rounded-full bg-orange-500 mr-3"></div>
+                <span class="text-sm text-gray-700">Action Agent (executes actions)</span>
+            </div>
+        </div>
+        <div class="mt-4 text-sm text-gray-600">
+            <p><strong>Tip:</strong> Click on any agent to view its details.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Include Cytoscape.js and dependencies -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Agent and link data from backend
+    const agents = {{ agents|tojson }};
+    const links = {{ links|tojson }};
+
+    // Build Cytoscape elements
+    const elements = [];
+
+    // Add nodes (agents)
+    agents.forEach(agent => {
+        let color = '#999';
+        if (agent.agent_category === 'source') color = '#10b981';  // green-500
+        else if (agent.agent_category === 'transform') color = '#3b82f6';  // blue-500
+        else if (agent.agent_category === 'action') color = '#f97316';  // orange-500
+
+        elements.push({
+            data: {
+                id: 'agent-' + agent.id,
+                label: agent.name,
+                agent_type: agent.job_type,
+                category: agent.agent_category,
+                agent_id: agent.id
+            },
+            classes: agent.agent_category
+        });
+    });
+
+    // Add edges (links)
+    links.forEach(link => {
+        elements.push({
+            data: {
+                id: 'link-' + link.id,
+                source: 'agent-' + link.source_agent_id,
+                target: 'agent-' + link.target_agent_id
+            }
+        });
+    });
+
+    // Initialize Cytoscape
+    const cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements: elements,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'background-color': '#666',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'width': 120,
+                    'height': 60,
+                    'font-size': 12,
+                    'color': '#fff',
+                    'text-wrap': 'wrap',
+                    'text-max-width': 100,
+                    'border-width': 2,
+                    'border-color': '#333'
+                }
+            },
+            {
+                selector: 'node.source',
+                style: {
+                    'background-color': '#10b981'
+                }
+            },
+            {
+                selector: 'node.transform',
+                style: {
+                    'background-color': '#3b82f6'
+                }
+            },
+            {
+                selector: 'node.action',
+                style: {
+                    'background-color': '#f97316'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 3,
+                    'line-color': '#9ca3af',
+                    'target-arrow-color': '#9ca3af',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'arrow-scale': 1.5
+                }
+            },
+            {
+                selector: 'node:selected',
+                style: {
+                    'border-width': 4,
+                    'border-color': '#fbbf24'
+                }
+            }
+        ],
+        layout: {
+            name: 'dagre',
+            rankDir: 'LR',  // Left to right
+            padding: 50,
+            spacingFactor: 1.5
+        }
+    });
+
+    // Click handler - navigate to agent detail
+    cy.on('tap', 'node', function(event) {
+        const agentId = event.target.data('agent_id');
+        window.location.href = '/agents/' + agentId;
+    });
+
+    // Add hover effect
+    cy.on('mouseover', 'node', function(event) {
+        document.body.style.cursor = 'pointer';
+    });
+
+    cy.on('mouseout', 'node', function(event) {
+        document.body.style.cursor = 'default';
+    });
+});
+</script>
+{% endblock %}

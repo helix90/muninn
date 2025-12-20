@@ -65,11 +65,13 @@ def init_extensions(app):
         raise
 
     try:
-        # Import jobs to ensure they are registered
-        from app.jobs import job_registry
-        app.logger.info(f"Job registry initialized with {len(job_registry)} job types")
+        # Import agent types to ensure they are registered
+        from app.agents import agent_registry
+        from app.agents import types as agent_types  # This triggers @register_agent decorators
+        registered_count = len(agent_registry.get_registered_types())
+        app.logger.info(f"Agent registry initialized with {registered_count} agent types")
     except Exception as e:
-        app.logger.error(f"Failed to initialize job registry: {e}")
+        app.logger.error(f"Failed to initialize agent registry: {e}")
         raise
 
     try:

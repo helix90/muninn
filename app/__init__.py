@@ -26,16 +26,16 @@ def create_app(config_name=None):
     
     # Register blueprints
     from app.main import main as main_blueprint
-    from app.jobs.views import jobs as jobs_blueprint
     from app.agents.views import agents as agents_blueprint
     from app.scheduler import scheduler_bp as scheduler_blueprint
     from app.auth import auth as auth_blueprint
+    from app.events import events as events_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
-    app.register_blueprint(jobs_blueprint)
     app.register_blueprint(agents_blueprint)
     app.register_blueprint(scheduler_blueprint)
+    app.register_blueprint(events_blueprint)
     
     # Register CLI commands
     from app.cli import register_commands
@@ -84,21 +84,45 @@ def setup_logging(app):
 
 def register_error_handlers(app):
     """Register application error handlers."""
-    
+
     @app.errorhandler(404)
     def not_found_error(error):
         """Handle 404 errors."""
         app.logger.warning(f'Page not found: {request.url}')
         return render_template('errors/404.html'), 404
-    
+
     @app.errorhandler(500)
     def internal_error(error):
         """Handle 500 errors."""
+        from app.extensions import db
         app.logger.error(f'Server Error: {error}')
+        try:
+            db.session.rollback()
+        except:
+            pass
         return render_template('errors/500.html'), 500
-    
+
     @app.errorhandler(Exception)
     def handle_exception(e):
         """Handle unhandled exceptions."""
+        from app.extensions import db
         app.logger.error(f'Unhandled exception: {e}')
-        return render_template('errors/500.html'), 500 
+        try:
+            db.session.rollback()
+        except:
+            pass
+        return render_template('errors/500.html'), 500
+
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        """Cleanup database session after each request."""
+        from app.extensions import db
+        if exception:
+            try:
+                db.session.rollback()
+            except:
+                pass
+        try:
+            db.session.remove()
+        except:
+            pass 

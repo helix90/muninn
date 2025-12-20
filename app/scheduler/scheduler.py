@@ -4,6 +4,9 @@ Job scheduler service for Muninn automation platform
 
 import logging
 import atexit
+import random
+import threading
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,11 +20,136 @@ from croniter import croniter
 from sqlalchemy.orm import Session
 
 from app.extensions import db
-from app.services.job_service import JobService
 from app.services.agent_service import AgentService
-from app.jobs.enums import JobStatus
 
 logger = logging.getLogger(__name__)
+
+
+class JobExecutionRateLimiter:
+    """
+    Rate limiter for job execution starts.
+
+    Limits how many jobs can start per second to prevent system overload.
+    Uses token bucket algorithm.
+    """
+
+    def __init__(self, max_starts_per_second=5):
+        """
+        Initialize rate limiter.
+
+        Args:
+            max_starts_per_second: Maximum number of job starts per second
+        """
+        self.max_starts_per_second = max_starts_per_second
+        self.tokens = max_starts_per_second
+        self.last_update = time.time()
+        self.lock = threading.Lock()
+
+    def acquire(self):
+        """
+        Acquire permission to start a job.
+        Blocks until permission is granted.
+        """
+        while True:
+            with self.lock:
+                now = time.time()
+                # Refill tokens based on time passed
+                time_passed = now - self.last_update
+                self.tokens = min(
+                    self.max_starts_per_second,
+                    self.tokens + time_passed * self.max_starts_per_second
+                )
+                self.last_update = now
+
+                if self.tokens >= 1:
+                    self.tokens -= 1
+                    return
+
+            # Wait a bit before trying again
+            time.sleep(0.1)
+
+
+# Global rate limiter instance (initialized with default, can be reconfigured)
+_rate_limiter = JobExecutionRateLimiter(max_starts_per_second=5)
+
+
+def execute_scheduled_job(job_id: int):
+    """
+    Execute a scheduled job/agent with automatic jitter and rate limiting.
+
+    This is a module-level function (not a closure) so it can be serialized
+    by APScheduler's SQLAlchemyJobStore.
+
+    Implements Thundering Herd Prevention:
+    - Automatic 0-60 second jitter (deterministic per job+hour)
+    - Global rate limiting (5 starts/second by default)
+
+    Args:
+        job_id: ID of the job/agent to execute
+    """
+    try:
+        # STEP 1: Apply jitter (0-60 seconds)
+        # Use job_id + current hour as seed for deterministic jitter
+        # This ensures the same job always gets the same offset within each hour
+        current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        seed_value = hash((job_id, current_hour))
+        random.seed(seed_value)
+
+        # Get jitter range from scheduler config if available
+        from app.scheduler import scheduler as scheduler_instance
+        if scheduler_instance.app:
+            jitter_min = scheduler_instance.app.config.get('SCHEDULER_JITTER_MIN_SECONDS', 0)
+            jitter_max = scheduler_instance.app.config.get('SCHEDULER_JITTER_MAX_SECONDS', 60)
+        else:
+            jitter_min, jitter_max = 0, 60
+
+        jitter_seconds = random.uniform(jitter_min, jitter_max)
+        logger.debug(f"Job {job_id} applying jitter: {jitter_seconds:.2f}s")
+        time.sleep(jitter_seconds)
+
+        # STEP 2: Acquire rate limit token
+        logger.debug(f"Job {job_id} acquiring rate limit token")
+        _rate_limiter.acquire()
+
+        # STEP 3: Execute job (within Flask app context)
+        logger.info(f"Executing scheduled job/agent {job_id}")
+
+        # Ensure we have an app context for database operations
+        if not scheduler_instance.app:
+            logger.error("Scheduler not initialized with Flask app")
+            return
+
+        with scheduler_instance.app.app_context():
+            # Get job from database
+            from app.models import Job
+            job = db.session.query(Job).get(job_id)
+            if not job:
+                logger.error(f"Job/Agent {job_id} not found")
+                return
+
+            # Run the agent using the agent service
+            result = scheduler_instance.agent_service.run_agent(
+                agent_id=job_id,
+                manual=False,
+                propagate=True  # Auto-propagate events
+            )
+
+            if result['success']:
+                logger.info(
+                    f"Scheduled agent {job_id} completed successfully, "
+                    f"created {result.get('events_created', 0)} events"
+                )
+                if 'propagation_stats' in result:
+                    stats = result['propagation_stats']
+                    logger.info(
+                        f"Event propagation: {stats['events_propagated']} events propagated, "
+                        f"{stats['agents_executed']} agents executed"
+                    )
+            else:
+                logger.error(f"Scheduled agent {job_id} failed: {result.get('error', 'Unknown error')}")
+
+    except Exception as e:
+        logger.error(f"Error executing scheduled job/agent {job_id}: {e}", exc_info=True)
 
 
 class JobScheduler:
@@ -30,7 +158,6 @@ class JobScheduler:
     def __init__(self, app=None):
         self.app = app
         self.scheduler = None
-        self.job_service = None
         self.agent_service = None
 
         if app:
@@ -39,8 +166,13 @@ class JobScheduler:
     def init_app(self, app):
         """Initialize scheduler with Flask app."""
         self.app = app
-        self.job_service = JobService(db.session)
         self.agent_service = AgentService(db.session)
+
+        # Reconfigure global rate limiter with app config
+        global _rate_limiter
+        max_starts = app.config.get('SCHEDULER_MAX_STARTS_PER_SECOND', 5)
+        _rate_limiter = JobExecutionRateLimiter(max_starts_per_second=max_starts)
+        logger.info(f"Initialized scheduler rate limiter: {max_starts} starts/second")
 
         # Setup scheduler (creates BackgroundScheduler instance)
         self._setup_scheduler()
@@ -155,17 +287,15 @@ class JobScheduler:
             if not job:
                 logger.error(f"Job {job_id} not found")
                 return False
-            
-            # Create job function
-            job_func = self._create_job_function(job_id)
-            
-            # Schedule the job
+
+            # Schedule the job using module-level function (serializable)
             job_name = f"job_{job_id}"
             trigger = CronTrigger.from_crontab(cron_expression)
-            
+
             self.scheduler.add_job(
-                func=job_func,
+                func='app.scheduler.scheduler:execute_scheduled_job',
                 trigger=trigger,
+                args=[job_id],  # Pass job_id as argument
                 id=job_name,
                 name=f"Scheduled: {job.name}",
                 replace_existing=replace_existing,
@@ -175,8 +305,8 @@ class JobScheduler:
             
             # Update job's next scheduled run
             self._update_next_scheduled_run(job_id, cron_expression)
-            
-            logger.info(f"Scheduled job {job_id} with cron: {cron_expression}")
+
+            logger.info(f"Scheduled job {job_id} with cron: {cron_expression} (auto-jitter: 0-60s, rate-limited: 5/sec)")
             return True
             
         except Exception as e:
@@ -205,17 +335,15 @@ class JobScheduler:
             if not job:
                 logger.error(f"Job {job_id} not found")
                 return False
-            
-            # Create job function
-            job_func = self._create_job_function(job_id)
-            
-            # Schedule the job
+
+            # Schedule the job using module-level function (serializable)
             job_name = f"job_{job_id}"
             trigger = IntervalTrigger(minutes=interval_minutes)
-            
+
             self.scheduler.add_job(
-                func=job_func,
+                func='app.scheduler.scheduler:execute_scheduled_job',
                 trigger=trigger,
+                args=[job_id],  # Pass job_id as argument
                 id=job_name,
                 name=f"Interval: {job.name}",
                 replace_existing=replace_existing,
@@ -293,67 +421,6 @@ class JobScheduler:
         except Exception as e:
             logger.error(f"Failed to get job status for {job_id}: {e}")
             return None
-    
-    def _create_job_function(self, job_id: int):
-        """Create a job function that executes the job."""
-        def execute_scheduled_job():
-            try:
-                logger.info(f"Executing scheduled job/agent {job_id}")
-
-                # Check if this is an agent type (new system) or old job type
-                job = self._get_job(job_id)
-                if not job:
-                    logger.error(f"Job/Agent {job_id} not found")
-                    return
-
-                # Check if this is an agent type (registered in agent registry)
-                from app.agents.registry import agent_registry
-                is_agent = False
-                try:
-                    agent_class = agent_registry.get_agent_class(job.job_type)
-                    is_agent = agent_class.can_be_scheduled
-                except ValueError:
-                    # Not an agent type, use old job system
-                    is_agent = False
-
-                if is_agent:
-                    # Use new agent system
-                    result = self.agent_service.run_agent(
-                        agent_id=job_id,
-                        manual=False,
-                        propagate=True  # Auto-propagate events
-                    )
-
-                    if result['success']:
-                        logger.info(
-                            f"Scheduled agent {job_id} completed successfully, "
-                            f"created {result.get('events_created', 0)} events"
-                        )
-                        if 'propagation_stats' in result:
-                            stats = result['propagation_stats']
-                            logger.info(
-                                f"Event propagation: {stats['events_propagated']} events propagated, "
-                                f"{stats['agents_executed']} agents executed"
-                            )
-                    else:
-                        logger.error(f"Scheduled agent {job_id} failed: {result.get('error', 'Unknown error')}")
-                else:
-                    # Use old job system
-                    job_run, error = self.job_service.execute_job(
-                        job_id,
-                        user_id=None,
-                        internal=True  # Mark as internal/scheduler execution
-                    )
-
-                    if error:
-                        logger.error(f"Scheduled job {job_id} failed: {error}")
-                    else:
-                        logger.info(f"Scheduled job {job_id} completed successfully")
-
-            except Exception as e:
-                logger.error(f"Error executing scheduled job/agent {job_id}: {e}", exc_info=True)
-
-        return execute_scheduled_job
     
     def _get_job(self, job_id: int):
         """Get job from database."""

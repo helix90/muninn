@@ -125,6 +125,17 @@ class AgentRegistry:
         """
         return list(self._registry.keys())
 
+    def get_all_types(self) -> List[str]:
+        """
+        Get list of all registered agent types.
+
+        Alias for get_registered_types() for compatibility.
+
+        Returns:
+            List of agent type strings
+        """
+        return self.get_registered_types()
+
     def get_config_schema(self, agent_type: str) -> Dict[str, Any]:
         """
         Get configuration schema for an agent type.
@@ -153,44 +164,53 @@ class AgentRegistry:
             for agent_type, agent_class in self._registry.items()
         }
 
-    def get_source_agents(self) -> List[str]:
+    def get_source_agents(self) -> Dict[str, Dict[str, str]]:
         """
-        Get list of source agent types.
+        Get source agent types with metadata.
 
         Returns:
-            List of source agent type strings
+            Dictionary mapping agent types to their info (name, description)
         """
-        return [
-            agent_type
+        return {
+            agent_type: {
+                'name': agent_class.agent_type.replace('_', ' ').title(),
+                'description': (agent_class.__doc__ or 'No description').strip().split('\n')[0]
+            }
             for agent_type, agent_class in self._registry.items()
             if issubclass(agent_class, SourceAgent)
-        ]
+        }
 
-    def get_transform_agents(self) -> List[str]:
+    def get_transform_agents(self) -> Dict[str, Dict[str, str]]:
         """
-        Get list of transform agent types.
+        Get transform agent types with metadata.
 
         Returns:
-            List of transform agent type strings
+            Dictionary mapping agent types to their info (name, description)
         """
-        return [
-            agent_type
+        return {
+            agent_type: {
+                'name': agent_class.agent_type.replace('_', ' ').title(),
+                'description': (agent_class.__doc__ or 'No description').strip().split('\n')[0]
+            }
             for agent_type, agent_class in self._registry.items()
             if issubclass(agent_class, TransformAgent) and not issubclass(agent_class, SourceAgent)
-        ]
+        }
 
-    def get_action_agents(self) -> List[str]:
+    def get_action_agents(self) -> Dict[str, Dict[str, str]]:
         """
-        Get list of action agent types.
+        Get action agent types with metadata.
 
         Returns:
-            List of action agent type strings
+            Dictionary mapping agent types to their info (name, description)
         """
-        return [
-            agent_type
+        return {
+            agent_type: {
+                'name': agent_class.agent_type.replace('_', ' ').title(),
+                'description': (agent_class.__doc__ or 'No description').strip().split('\n')[0]
+            }
             for agent_type, agent_class in self._registry.items()
             if issubclass(agent_class, ActionAgent)
-        ]
+        }
 
     def get_agent_capabilities(self, agent_type: str) -> Dict[str, bool]:
         """

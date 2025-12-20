@@ -114,7 +114,8 @@ class AgentService:
                 return result
 
             # Execute agent (check method handles source agents)
-            events = agent.check()
+            # Source agents receive empty list since they don't process input events
+            events = agent.check([])
 
             # Persist events to database
             if events:

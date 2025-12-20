@@ -55,9 +55,9 @@ class TestUserRegistration:
         with app.app_context():
             user = User(
                 username='existinguser',
-                email='existing@example.com'
+                email='existing@example.com',
+                password='password123'
             )
-            user.set_password('password123')
             db.session.add(user)
             db.session.commit()
 
@@ -96,9 +96,9 @@ class TestUserLogin:
         with app.app_context():
             user = User(
                 username='loginuser',
-                email='login@example.com'
+                email='login@example.com',
+                password='password123'
             )
-            user.set_password('password123')
             db.session.add(user)
             db.session.commit()
 
@@ -126,9 +126,9 @@ class TestUserLogin:
         with app.app_context():
             user = User(
                 username='passwordtest',
-                email='passwordtest@example.com'
+                email='passwordtest@example.com',
+                password='correctpassword'
             )
-            user.set_password('correctpassword')
             db.session.add(user)
             db.session.commit()
 
@@ -145,18 +145,6 @@ class TestUserLogin:
 class TestProtectedRoutes:
     """Test that routes are properly protected."""
 
-    def test_jobs_route_requires_authentication(self, client):
-        """Test that job routes require authentication."""
-        response = client.get('/jobs/', follow_redirects=False)
-        # Should redirect to login
-        assert response.status_code in [302, 401]
-
-    def test_create_job_requires_authentication(self, client):
-        """Test that job creation requires authentication."""
-        response = client.get('/jobs/create', follow_redirects=False)
-        # Should redirect to login
-        assert response.status_code in [302, 401]
-
     def test_scheduler_route_requires_authentication(self, client):
         """Test that scheduler routes require authentication."""
         response = client.get('/scheduler/', follow_redirects=False)
@@ -170,8 +158,7 @@ class TestUserModel:
     def test_password_hashing(self, app):
         """Test that passwords are hashed."""
         with app.app_context():
-            user = User(username='hashtest', email='hash@example.com')
-            user.set_password('mypassword')
+            user = User(username='hashtest', email='hash@example.com', password='mypassword')
 
             # Password should be hashed, not stored as plaintext
             assert user.password_hash != 'mypassword'
@@ -180,8 +167,7 @@ class TestUserModel:
     def test_password_verification(self, app):
         """Test password verification."""
         with app.app_context():
-            user = User(username='verifytest', email='verify@example.com')
-            user.set_password('mypassword')
+            user = User(username='verifytest', email='verify@example.com', password='mypassword')
 
             # Correct password should verify
             assert user.check_password('mypassword') is True
@@ -192,8 +178,7 @@ class TestUserModel:
     def test_user_is_authenticated(self, app):
         """Test UserMixin is_authenticated property."""
         with app.app_context():
-            user = User(username='authtest', email='authtest@example.com')
-            user.set_password('password')
+            user = User(username='authtest', email='authtest@example.com', password='password')
             user.is_active = True
 
             # Active user should be authenticated
@@ -202,8 +187,7 @@ class TestUserModel:
     def test_user_get_id(self, app):
         """Test that get_id returns string ID."""
         with app.app_context():
-            user = User(username='idtest', email='idtest@example.com')
-            user.set_password('password')
+            user = User(username='idtest', email='idtest@example.com', password='password')
             db.session.add(user)
             db.session.commit()
 
@@ -264,8 +248,7 @@ class TestFlaskLoginIntegration:
 
         with app.app_context():
             # Create a user
-            user = User(username='loadertest', email='loader@example.com')
-            user.set_password('password')
+            user = User(username='loadertest', email='loader@example.com', password='password')
             db.session.add(user)
             db.session.commit()
             user_id = user.id

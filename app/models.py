@@ -5,7 +5,7 @@ Database models for Muninn automation platform
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime,
-    ForeignKey, JSON, Index, CheckConstraint, Enum
+    ForeignKey, JSON, Index, CheckConstraint
 )
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app.extensions import db
 from app.constants import (
-    VALID_JOB_TYPES, MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH,
+    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH,
     MAX_USERNAME_LENGTH, MAX_EMAIL_LENGTH
 )
 
@@ -85,7 +85,7 @@ class Job(db.Model):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, index=True)
-    job_type = Column(Enum('web_scraper', 'rss_reader', 'filter', 'email_sender', name='job_type_enum'), nullable=False, index=True)
+    job_type = Column(String(50), nullable=False, index=True)  # Changed from ENUM to String for agent system flexibility
     config = Column(JSON, nullable=False, default=dict)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
@@ -141,22 +141,30 @@ class Job(db.Model):
     
     @validates('job_type')
     def validate_job_type(self, key, job_type):
-        """Validate job type is supported."""
-        if job_type not in VALID_JOB_TYPES:
-            raise ValueError(f"Job type must be one of: {VALID_JOB_TYPES}")
+        """Validate job type is supported (only for new records)."""
+        from sqlalchemy import inspect as sa_inspect
+
+        # Only validate for new records, not when loading from database
+        # This allows legacy job types to exist in the database without causing errors
+        state = sa_inspect(self)
+        if not state.persistent and not state.deleted:
+            # Check against registered agent types
+            from app.agents.registry import agent_registry
+            if not agent_registry.is_registered(job_type):
+                raise ValueError(f"Job type '{job_type}' is not registered. Register it in the agent registry.")
+
         return job_type
     
     def validate_job_configuration(self):
-        """Validate job configuration against job type requirements."""
-        from app.jobs import job_registry
-        
-        if not job_registry.is_registered(self.job_type):
-            raise ValueError(f"Unknown job type: {self.job_type}")
-        
+        """Validate job configuration against agent type requirements."""
+        from app.agents.registry import agent_registry
+
+        if not agent_registry.is_registered(self.job_type):
+            raise ValueError(f"Unknown agent type: {self.job_type}")
+
         try:
-            # Create temporary job instance to validate config
-            job_class = job_registry.get_job_class(self.job_type)
-            temp_job = job_class(job_id=0, config=self.config, user_id=0)
+            # Validate configuration using agent registry
+            agent_registry.validate_agent_config(self.job_type, self.config)
             return True
         except Exception as e:
             raise ValueError(f"Configuration validation failed: {str(e)}")

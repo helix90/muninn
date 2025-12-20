@@ -43,8 +43,8 @@ def test_job(app_context):
     # Create a test job
     job = Job(
         name='Test Agent',
-        job_type='web_scraper',
-        config={},
+        job_type='rss_agent',  # Use valid agent type
+        config={'feed_url': 'https://example.com/feed.xml'},
         user_id=user.id
     )
     db.session.add(job)

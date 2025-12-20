@@ -111,19 +111,16 @@ class JabberAgent(ActionAgent):
             if not isinstance(self.config['use_tls'], bool):
                 raise ValueError("'use_tls' must be a boolean")
 
-    def process(self, events: List[Event]) -> List[Event]:
+    def act(self, events: List[Event]) -> None:
         """
         Send XMPP messages for each event.
 
         Args:
             events: Events to process
-
-        Returns:
-            Empty list (terminal agent does not create events)
         """
         if not XMPP_AVAILABLE:
             self.log('slixmpp library not available, skipping messages', level='error')
-            return []
+            return
 
         jid = self.config['jid']
         password = self.config['password']
@@ -160,9 +157,6 @@ class JabberAgent(ActionAgent):
             'sent_count': sent_count,
             'failed_count': failed_count
         })
-
-        # Terminal agent: return empty list
-        return []
 
     def _render_template(self, template_str: str, data: Dict[str, Any]) -> str:
         """

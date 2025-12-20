@@ -98,12 +98,12 @@ class TestBlueprintRegistration:
         assert app.blueprints['auth'].name == 'auth'
         assert app.blueprints['auth'].url_prefix == '/auth'
 
-    def test_jobs_blueprint_registered(self):
-        """Test that jobs blueprint is registered."""
+    def test_agents_blueprint_registered(self):
+        """Test that agents blueprint is registered."""
         app = create_app('testing')
-        assert 'jobs' in app.blueprints
-        assert app.blueprints['jobs'].name == 'jobs'
-        assert app.blueprints['jobs'].url_prefix == '/jobs'
+        assert 'agents' in app.blueprints
+        assert app.blueprints['agents'].name == 'agents'
+        assert app.blueprints['agents'].url_prefix == '/agents'
 
     def test_scheduler_blueprint_registered(self):
         """Test that scheduler blueprint is registered."""
@@ -115,7 +115,7 @@ class TestBlueprintRegistration:
     def test_all_expected_blueprints_present(self):
         """Test that all expected blueprints are registered."""
         app = create_app('testing')
-        expected_blueprints = ['main', 'auth', 'jobs', 'scheduler']
+        expected_blueprints = ['main', 'auth', 'agents', 'scheduler']
         for blueprint_name in expected_blueprints:
             assert blueprint_name in app.blueprints, f"Blueprint '{blueprint_name}' not registered"
 
@@ -134,14 +134,6 @@ class TestModuleImports:
         except ImportError as e:
             pytest.fail(f"Failed to import models: {e}")
 
-    def test_import_forms(self):
-        """Test that forms module can be imported."""
-        try:
-            from app import forms
-            assert hasattr(forms, 'JobCreationForm')
-        except ImportError as e:
-            pytest.fail(f"Failed to import forms: {e}")
-
     def test_import_extensions(self):
         """Test that extensions module can be imported."""
         try:
@@ -151,17 +143,6 @@ class TestModuleImports:
             assert hasattr(extensions, 'login_manager')
         except ImportError as e:
             pytest.fail(f"Failed to import extensions: {e}")
-
-    def test_import_job_types(self):
-        """Test that all job type modules can be imported."""
-        try:
-            from app.jobs.types import WebScraperJob, RSSReaderJob, FilterJob, EmailSenderJob
-            assert WebScraperJob is not None
-            assert RSSReaderJob is not None
-            assert FilterJob is not None
-            assert EmailSenderJob is not None
-        except ImportError as e:
-            pytest.fail(f"Failed to import job types: {e}")
 
     def test_import_utilities(self):
         """Test that utility modules can be imported."""
@@ -173,14 +154,13 @@ class TestModuleImports:
         except ImportError as e:
             pytest.fail(f"Failed to import utilities: {e}")
 
-    def test_import_services(self):
-        """Test that service modules can be imported."""
+    def test_import_agent_service(self):
+        """Test that agent service module can be imported."""
         try:
-            from app.services import job_service, scheduler_service
-            assert hasattr(job_service, 'JobService')
-            assert hasattr(scheduler_service, 'SchedulerService')
+            from app.services import agent_service
+            assert hasattr(agent_service, 'AgentService')
         except ImportError as e:
-            pytest.fail(f"Failed to import services: {e}")
+            pytest.fail(f"Failed to import agent service: {e}")
 
 
 class TestSchedulerInitialization:
@@ -264,58 +244,24 @@ class TestEncryptionInitialization:
             assert decrypted['password'] == 'secret123'
 
 
-class TestJobRegistryInitialization:
-    """Test that job registry initializes correctly."""
+class TestAgentRegistryInitialization:
+    """Test that agent registry initializes correctly."""
 
-    def test_job_registry_imports(self):
-        """Test that job registry can be imported."""
+    def test_agent_registry_imports(self):
+        """Test that agent registry can be imported."""
         try:
-            from app.jobs import job_registry
-            assert job_registry is not None
+            from app.agents import agent_registry
+            assert agent_registry is not None
         except ImportError as e:
-            pytest.fail(f"Failed to import job registry: {e}")
+            pytest.fail(f"Failed to import agent registry: {e}")
 
-    def test_job_registry_has_jobs(self):
-        """Test that job types are registered."""
-        from app.jobs import job_registry
-        registered_types = job_registry.get_registered_types()
+    def test_agent_registry_has_agents(self):
+        """Test that agent types are registered."""
+        from app.agents import agent_registry
+        registered_types = agent_registry.get_registered_types()
         assert len(registered_types) > 0
-        assert 'web_scraper' in registered_types
-        assert 'rss_reader' in registered_types
-        assert 'filter' in registered_types
-        assert 'email_sender' in registered_types
-
-    def test_job_registry_can_create_jobs(self):
-        """Test that job registry can create job instances."""
-        from app.jobs import job_registry
-
-        # This should not crash (regression test for registry initialization bug)
-        try:
-            job = job_registry.create_job(
-                job_type='web_scraper',
-                job_id=1,
-                config={
-                    'url': 'https://example.com',
-                    'selectors': {'title': 'h1', 'content': 'p'}
-                },
-                user_id=1
-            )
-            assert job is not None
-        except Exception as e:
-            pytest.fail(f"Failed to create job from registry: {e}")
-
-    def test_job_registry_schema_extraction(self):
-        """Test that job registry can extract schemas without instantiation."""
-        from app.jobs import job_registry
-
-        # This should work using the static class method (regression test)
-        try:
-            schema = job_registry.get_config_schema('web_scraper')
-            assert schema is not None
-            assert 'job_type' in schema
-            assert 'required_fields' in schema
-        except Exception as e:
-            pytest.fail(f"Failed to extract job schema: {e}")
+        # Check for some known agent types
+        assert 'rss_agent' in registered_types
 
 
 class TestDatabaseConnection:

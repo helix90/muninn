@@ -15,19 +15,7 @@ class TestMainViews:
         response = client.get('/')
         assert response.status_code == 200
         assert b'Muninn' in response.data
-        assert b'Automation Platform' in response.data
-    
-    def test_index_route_content(self, client):
-        """Test the home page content."""
-        response = client.get('/')
-        assert response.status_code == 200
-        
-        # Check for key content elements
-        content = response.data.decode('utf-8')
-        assert 'Welcome to the Future of Automation' in content
-        assert 'Intelligent Automation' in content
-        assert 'Easy Deployment' in content
-        assert 'Monitoring & Analytics' in content
+        assert b'Dashboard' in response.data
     
     def test_index_route_response_headers(self, client):
         """Test the home page response headers."""
@@ -154,14 +142,14 @@ class TestResponseFormats:
         """Test that HTML routes return proper HTML."""
         response = client.get('/')
         assert response.content_type == 'text/html; charset=utf-8'
-        
+
         # Check for basic HTML structure
         content = response.data.decode('utf-8')
         assert '<!DOCTYPE html>' in content
         assert '<html' in content
         assert '</html>' in content
         assert '<head>' in content
-        assert '<body>' in content
+        assert '<body' in content  # Changed to match body tag with attributes
     
     def test_json_responses(self, client):
         """Test that JSON routes return proper JSON."""

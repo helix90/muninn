@@ -252,4 +252,70 @@ class FilterAgent(TransformAgent):
             'value': {'type': 'any', 'required': False, 'description': 'Value to compare against (not needed for exists/not_exists)'},
             'case_sensitive': {'type': 'boolean', 'default': True, 'description': 'Whether string comparisons are case-sensitive'}
         }
+
+        # Add filter type metadata for UI builder
+        schema['filter_types'] = [
+            {'value': 'equals', 'label': 'Equals', 'description': 'Exact match', 'needs_value': True},
+            {'value': 'not_equals', 'label': 'Not Equals', 'description': 'Not equal to value', 'needs_value': True},
+            {'value': 'contains', 'label': 'Contains', 'description': 'String contains substring', 'needs_value': True},
+            {'value': 'not_contains', 'label': 'Not Contains', 'description': 'String does not contain substring', 'needs_value': True},
+            {'value': 'starts_with', 'label': 'Starts With', 'description': 'String starts with prefix', 'needs_value': True},
+            {'value': 'ends_with', 'label': 'Ends With', 'description': 'String ends with suffix', 'needs_value': True},
+            {'value': 'regex', 'label': 'Regex Match', 'description': 'Matches regular expression', 'needs_value': True},
+            {'value': 'greater_than', 'label': 'Greater Than', 'description': 'Numeric value is greater than', 'needs_value': True},
+            {'value': 'less_than', 'label': 'Less Than', 'description': 'Numeric value is less than', 'needs_value': True},
+            {'value': 'greater_than_or_equal', 'label': 'Greater Than or Equal', 'description': 'Numeric value is ≥', 'needs_value': True},
+            {'value': 'less_than_or_equal', 'label': 'Less Than or Equal', 'description': 'Numeric value is ≤', 'needs_value': True},
+            {'value': 'in_list', 'label': 'In List', 'description': 'Value is in list', 'needs_value': True},
+            {'value': 'not_in_list', 'label': 'Not In List', 'description': 'Value is not in list', 'needs_value': True},
+            {'value': 'exists', 'label': 'Field Exists', 'description': 'Field is present in event', 'needs_value': False},
+            {'value': 'not_exists', 'label': 'Field Does Not Exist', 'description': 'Field is missing from event', 'needs_value': False},
+        ]
+
+        # Add example rules for quick start
+        schema['example_rules'] = [
+            {
+                'name': 'Filter by Title Keyword',
+                'description': 'Keep events with "Python" in title (case-insensitive)',
+                'rules': [
+                    {'field': 'title', 'type': 'contains', 'value': 'Python', 'case_sensitive': False}
+                ],
+                'match_all': True
+            },
+            {
+                'name': 'Filter by Status',
+                'description': 'Keep events with status="active"',
+                'rules': [
+                    {'field': 'status', 'type': 'equals', 'value': 'active', 'case_sensitive': True}
+                ],
+                'match_all': True
+            },
+            {
+                'name': 'Filter by Score Range',
+                'description': 'Keep events with score >= 80',
+                'rules': [
+                    {'field': 'score', 'type': 'greater_than_or_equal', 'value': 80}
+                ],
+                'match_all': True
+            },
+            {
+                'name': 'Multiple Conditions (AND)',
+                'description': 'Keep events with priority="high" AND status exists',
+                'rules': [
+                    {'field': 'priority', 'type': 'equals', 'value': 'high', 'case_sensitive': True},
+                    {'field': 'status', 'type': 'exists'}
+                ],
+                'match_all': True
+            },
+            {
+                'name': 'Multiple Conditions (OR)',
+                'description': 'Keep events from "news" OR "blog" categories',
+                'rules': [
+                    {'field': 'category', 'type': 'equals', 'value': 'news', 'case_sensitive': False},
+                    {'field': 'category', 'type': 'equals', 'value': 'blog', 'case_sensitive': False}
+                ],
+                'match_all': False
+            }
+        ]
+
         return schema

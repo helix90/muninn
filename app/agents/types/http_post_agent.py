@@ -99,15 +99,12 @@ class HTTPPostAgent(ActionAgent):
             if not isinstance(self.config['verify_ssl'], bool):
                 raise ValueError("'verify_ssl' must be a boolean")
 
-    def process(self, events: List[Event]) -> List[Event]:
+    def act(self, events: List[Event]) -> None:
         """
         Send HTTP POST requests for each event.
 
         Args:
             events: Events to process
-
-        Returns:
-            Empty list (terminal agent does not create events)
         """
         method = self.config.get('method', 'POST').upper()
         content_type = self.config.get('content_type', 'application/json')
@@ -185,9 +182,6 @@ class HTTPPostAgent(ActionAgent):
             'failed_count': failed_count,
             'method': method
         })
-
-        # Terminal agent: return empty list
-        return []
 
     def _render_template(self, template_str: str, data: Dict[str, Any]) -> str:
         """

@@ -275,15 +275,30 @@ class TestAgentService:
             assert result['success'] == False
             assert 'not found' in result['error'].lower()
 
-    def test_run_agent_inactive(self, app, test_job):
+    def test_run_agent_inactive(self, app):
         """Test running inactive agent"""
         with app.app_context():
-            # Make test_job inactive
-            test_job.is_active = False
+            # Create an inactive agent with a valid agent type
+            from app.models import User, Job
+
+            # Create test user first
+            user = User(username='testuser', email='test@example.com', password='password123')
+            db.session.add(user)
+            db.session.flush()
+
+            inactive_agent = Job(
+                name='Inactive Agent',
+                job_type='rss_agent',  # Use valid agent type
+                config={'feed_url': 'https://example.com/feed.xml'},
+                user_id=user.id
+            )
+            # Set as inactive after creation
+            inactive_agent.is_active = False
+            db.session.add(inactive_agent)
             db.session.commit()
 
             service = AgentService(db.session)
-            result = service.run_agent(agent_id=test_job.id)
+            result = service.run_agent(agent_id=inactive_agent.id)
 
             assert result['success'] == False
             assert 'not active' in result['error'].lower()

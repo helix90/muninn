@@ -6,13 +6,14 @@ Provides web interface for managing agents (new agent system)
 
 import logging
 import json
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.services.agent_service import AgentService
 from app.agents.registry import agent_registry
 from app.models import Job, AgentLink
+from app.scheduler import scheduler
 
 # Create blueprint
 agents = Blueprint('agents', __name__, url_prefix='/agents')
@@ -132,13 +133,26 @@ def create_agent():
                 name=name,
                 job_type=agent_type,
                 config=config,
-                schedule=schedule if schedule else None,
-                user_id=user_id,
-                is_active=True
+                user_id=user_id
             )
+
+            # Set schedule and is_active as attributes (not constructor params)
+            if schedule:
+                agent.schedule_cron = schedule
+                agent.schedule_enabled = True
+            agent.is_active = True
 
             db.session.add(agent)
             db.session.commit()
+
+            # Notify scheduler if schedule was set
+            if schedule:
+                try:
+                    scheduler.schedule_job(agent.id, schedule)
+                    logger.info(f"Scheduled agent {agent.id} with cron: {schedule}")
+                except Exception as e:
+                    logger.error(f"Failed to schedule agent {agent.id}: {e}")
+                    flash('Agent created but schedule could not be registered. Please edit and save again.', 'warning')
 
             flash(f'Agent "{name}" created successfully', 'success')
             return redirect(url_for('agents.agent_detail', agent_id=agent.id))
@@ -154,6 +168,111 @@ def create_agent():
         db.session.rollback()
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('agents.agent_list'))
+
+
+@agents.route('/<int:agent_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_agent(agent_id):
+    """Agent edit form."""
+    try:
+        user_id = current_user.id
+        agent_service = AgentService(db.session)
+
+        # Get agent
+        agent = db.session.query(Job).filter(
+            Job.id == agent_id,
+            Job.user_id == user_id
+        ).first()
+
+        if not agent:
+            flash('Agent not found', 'error')
+            return redirect(url_for('agents.agent_list'))
+
+        # Get available agent types
+        source_agents = agent_registry.get_source_agents()
+        transform_agents = agent_registry.get_transform_agents()
+        action_agents = agent_registry.get_action_agents()
+
+        if request.method == 'POST':
+            # Process form submission
+            name = request.form.get('name', '').strip()
+            schedule = request.form.get('schedule', '').strip()
+
+            # Validate required fields
+            if not name:
+                flash('Agent name is required', 'error')
+                return render_template('agents/edit.html',
+                                     agent=agent,
+                                     source_agents=source_agents,
+                                     transform_agents=transform_agents,
+                                     action_agents=action_agents)
+
+            # Get agent-specific configuration from form
+            config = {}
+            for key in request.form:
+                if key.startswith('config_'):
+                    config_key = key[7:]  # Remove 'config_' prefix
+                    value = request.form.get(key, '').strip()
+                    if value:
+                        # Try to parse as JSON for complex values
+                        try:
+                            config[config_key] = json.loads(value)
+                        except:
+                            config[config_key] = value
+
+            # Validate configuration
+            is_valid, error = agent_service.validate_agent_config(agent.job_type, config)
+            if not is_valid:
+                flash(f'Invalid configuration: {error}', 'error')
+                return render_template('agents/edit.html',
+                                     agent=agent,
+                                     source_agents=source_agents,
+                                     transform_agents=transform_agents,
+                                     action_agents=action_agents,
+                                     name=name,
+                                     config=config)
+
+            # Update agent
+            agent.name = name
+            agent.config = config
+
+            # Update schedule
+            if schedule:
+                agent.schedule_cron = schedule
+                agent.schedule_enabled = True
+            else:
+                agent.schedule_cron = None
+                agent.schedule_enabled = False
+
+            db.session.commit()
+
+            # Update scheduler
+            try:
+                if schedule:
+                    scheduler.schedule_job(agent.id, schedule, replace_existing=True)
+                    logger.info(f"Updated schedule for agent {agent.id} with cron: {schedule}")
+                else:
+                    scheduler.unschedule_job(agent.id)
+                    logger.info(f"Removed schedule for agent {agent.id}")
+            except Exception as e:
+                logger.error(f"Failed to update schedule for agent {agent.id}: {e}")
+                flash('Agent updated but schedule could not be registered. Please try saving again.', 'warning')
+
+            flash(f'Agent "{name}" updated successfully', 'success')
+            return redirect(url_for('agents.agent_detail', agent_id=agent.id))
+
+        # GET request - show edit form
+        return render_template('agents/edit.html',
+                             agent=agent,
+                             source_agents=source_agents,
+                             transform_agents=transform_agents,
+                             action_agents=action_agents)
+
+    except Exception as e:
+        logger.error(f"Error in edit_agent: {e}", exc_info=True)
+        db.session.rollback()
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('agents.agent_detail', agent_id=agent_id))
 
 
 @agents.route('/<int:agent_id>')
@@ -188,6 +307,9 @@ def agent_detail(agent_id):
         event_service = EventService(db.session)
         network_stats = event_service.get_agent_network_stats(agent_id)
 
+        # Get recent events (limit 10)
+        recent_events = event_service.get_events_for_agent(agent_id, limit=10)
+
         # Get upstream and downstream agents
         upstream_links = db.session.query(AgentLink).filter(
             AgentLink.target_agent_id == agent_id,
@@ -199,6 +321,34 @@ def agent_detail(agent_id):
             AgentLink.is_active == True
         ).all()
 
+        # Get available agents for linking (only those that can receive events)
+        from app.agents.registry import agent_registry
+
+        available_agents = []
+        all_agents = db.session.query(Job).filter(
+            Job.user_id == user_id,
+            Job.id != agent_id,  # Exclude current agent
+            Job.is_active == True
+        ).all()
+
+        for potential_target in all_agents:
+            # Check if this agent can receive events
+            try:
+                agent_class = agent_registry.get_agent_class(potential_target.job_type)
+            except ValueError:
+                # Agent type not registered, skip it
+                continue
+
+            if agent_class and agent_class.can_receive_events:
+                # Check if link doesn't already exist
+                existing_link = db.session.query(AgentLink).filter(
+                    AgentLink.source_agent_id == agent_id,
+                    AgentLink.target_agent_id == potential_target.id
+                ).first()
+
+                if not existing_link:
+                    available_agents.append(potential_target)
+
         return render_template('agents/detail.html',
                              agent=agent,
                              stats=stats,
@@ -206,7 +356,9 @@ def agent_detail(agent_id):
                              capabilities=capabilities,
                              network_stats=network_stats,
                              upstream_links=upstream_links,
-                             downstream_links=downstream_links)
+                             downstream_links=downstream_links,
+                             recent_events=recent_events,
+                             available_agents=available_agents)
 
     except Exception as e:
         logger.error(f"Error in agent_detail: {e}", exc_info=True)
@@ -373,3 +525,68 @@ def get_agent_schema(agent_type):
     except Exception as e:
         logger.error(f"Error getting schema for {agent_type}: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+@agents.route('/pipeline')
+@login_required
+def pipeline():
+    """Show agent pipeline visualization."""
+    try:
+        user_id = current_user.id
+
+        # Get all user's agents
+        agents_query = db.session.query(Job).filter(
+            Job.user_id == user_id,
+            Job.is_active == True
+        ).all()
+
+        # Build agent data with categories
+        agents_data = []
+        for agent in agents_query:
+            try:
+                agent_class = agent_registry.get_agent_class(agent.job_type)
+            except ValueError:
+                # Agent type not registered, set category as unknown
+                agent_class = None
+
+            # Determine category
+            category = 'unknown'
+            if agent_class:
+                if hasattr(agent_class, '__bases__'):
+                    from app.agents.base import SourceAgent, TransformAgent, ActionAgent
+                    if issubclass(agent_class, ActionAgent):
+                        category = 'action'
+                    elif issubclass(agent_class, TransformAgent):
+                        category = 'transform'
+                    elif issubclass(agent_class, SourceAgent):
+                        category = 'source'
+
+            agents_data.append({
+                'id': agent.id,
+                'name': agent.name,
+                'job_type': agent.job_type,
+                'agent_category': category
+            })
+
+        # Get all links between user's agents
+        agent_ids = [a['id'] for a in agents_data]
+        links_query = db.session.query(AgentLink).filter(
+            AgentLink.source_agent_id.in_(agent_ids),
+            AgentLink.target_agent_id.in_(agent_ids),
+            AgentLink.is_active == True
+        ).all()
+
+        links_data = [{
+            'id': link.id,
+            'source_agent_id': link.source_agent_id,
+            'target_agent_id': link.target_agent_id
+        } for link in links_query]
+
+        return render_template('agents/pipeline.html',
+                             agents=agents_data,
+                             links=links_data)
+
+    except Exception as e:
+        logger.error(f"Error in pipeline view: {e}", exc_info=True)
+        flash('An error occurred while loading pipeline visualization', 'error')
+        return redirect(url_for('agents.agent_list'))

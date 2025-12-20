@@ -446,12 +446,32 @@ def create_link():
         user_id = current_user.id
         agent_service = AgentService(db.session)
 
-        data = request.get_json()
-        source_id = data.get('source_agent_id')
-        target_id = data.get('target_agent_id')
+        # Support both JSON (API) and form data (web UI)
+        if request.is_json:
+            data = request.get_json()
+            source_id = data.get('source_agent_id')
+            target_id = data.get('target_agent_id')
+        else:
+            source_id = request.form.get('source_agent_id')
+            target_id = request.form.get('target_agent_id')
 
         if not source_id or not target_id:
-            return jsonify({'success': False, 'error': 'Missing agent IDs'}), 400
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Missing agent IDs'}), 400
+            else:
+                flash('Missing agent IDs', 'error')
+                return redirect(url_for('agents.agent_list'))
+
+        # Convert to int
+        try:
+            source_id = int(source_id)
+            target_id = int(target_id)
+        except (ValueError, TypeError):
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Invalid agent IDs'}), 400
+            else:
+                flash('Invalid agent IDs', 'error')
+                return redirect(url_for('agents.agent_detail', agent_id=source_id))
 
         # Verify ownership of both agents
         source = db.session.query(Job).filter(
@@ -465,19 +485,35 @@ def create_link():
         ).first()
 
         if not source or not target:
-            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Agent not found'}), 404
+            else:
+                flash('Agent not found', 'error')
+                return redirect(url_for('agents.agent_list'))
 
         # Create link
         result = agent_service.create_agent_link(source_id, target_id)
 
         if result['success']:
-            return jsonify(result)
+            if request.is_json:
+                return jsonify(result)
+            else:
+                flash(f'Successfully linked {source.name} to {target.name}', 'success')
+                return redirect(url_for('agents.agent_detail', agent_id=source_id))
         else:
-            return jsonify(result), 400
+            if request.is_json:
+                return jsonify(result), 400
+            else:
+                flash(f'Error creating link: {result.get("error", "Unknown error")}', 'error')
+                return redirect(url_for('agents.agent_detail', agent_id=source_id))
 
     except Exception as e:
         logger.error(f"Error creating link: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
+        else:
+            flash(f'An error occurred: {str(e)}', 'error')
+            return redirect(url_for('agents.agent_list'))
 
 
 @agents.route('/link/<int:link_id>/delete', methods=['POST'])

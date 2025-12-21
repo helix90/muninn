@@ -215,7 +215,7 @@ class EventService:
         from datetime import datetime
 
         # Check if agent can receive events first (before creating run record)
-        agent_class = agent_registry.get(agent_model.job_type)
+        agent_class = agent_registry.get_agent_class(agent_model.job_type)
         if agent_class and not agent_class.can_receive_events:
             logger.warning(
                 f'Agent {agent_model.id} ({agent_model.job_type}) '

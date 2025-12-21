@@ -249,14 +249,21 @@ def edit_agent(agent_id):
             # Update scheduler
             try:
                 if schedule:
-                    scheduler.schedule_job(agent.id, schedule, replace_existing=True)
-                    logger.info(f"Updated schedule for agent {agent.id} with cron: {schedule}")
+                    result = scheduler.schedule_job(agent.id, schedule, replace_existing=True)
+                    if result:
+                        logger.info(f"Updated schedule for agent {agent.id} with cron: {schedule}")
+                    else:
+                        logger.error(f"Failed to schedule agent {agent.id}: schedule_job returned False")
+                        flash('Agent updated but schedule could not be registered. Check logs for details.', 'error')
                 else:
-                    scheduler.unschedule_job(agent.id)
-                    logger.info(f"Removed schedule for agent {agent.id}")
+                    result = scheduler.unschedule_job(agent.id)
+                    if result:
+                        logger.info(f"Removed schedule for agent {agent.id}")
+                    else:
+                        logger.warning(f"Failed to unschedule agent {agent.id}: agent may not have been scheduled")
             except Exception as e:
-                logger.error(f"Failed to update schedule for agent {agent.id}: {e}")
-                flash('Agent updated but schedule could not be registered. Please try saving again.', 'warning')
+                logger.error(f"Failed to update schedule for agent {agent.id}: {e}", exc_info=True)
+                flash(f'Agent updated but schedule error: {str(e)}', 'error')
 
             flash(f'Agent "{name}" updated successfully', 'success')
             return redirect(url_for('agents.agent_detail', agent_id=agent.id))

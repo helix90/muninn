@@ -104,6 +104,7 @@ class Job(db.Model):
     # Relationships
     user = relationship('User', back_populates='jobs')
     runs = relationship('JobRun', back_populates='job', cascade='all, delete-orphan')
+    agent_runs = relationship('AgentRun', back_populates='agent', cascade='all, delete-orphan')
     parent_chains = relationship('JobChain', foreign_keys='JobChain.parent_job_id', back_populates='parent_job')
     child_chains = relationship('JobChain', foreign_keys='JobChain.child_job_id', back_populates='child_job')
     
@@ -298,7 +299,7 @@ class AgentRun(db.Model):
     output_event_ids = Column(JSON, nullable=True, default=list)
 
     # Relationships
-    agent = relationship('Job', foreign_keys=[agent_id], backref='agent_runs')
+    agent = relationship('Job', foreign_keys=[agent_id], back_populates='agent_runs')
 
     # Constraints
     __table_args__ = (

@@ -211,6 +211,28 @@ class EventService:
             List of new events created by the agent (empty for action agents)
         """
         from app.agents.registry import agent_registry
+        from app.models import AgentRun
+        from datetime import datetime
+
+        # Check if agent can receive events first (before creating run record)
+        agent_class = agent_registry.get(agent_model.job_type)
+        if agent_class and not agent_class.can_receive_events:
+            logger.warning(
+                f'Agent {agent_model.id} ({agent_model.job_type}) '
+                f'cannot receive events, skipping'
+            )
+            return []
+
+        # Create AgentRun record to track this execution
+        agent_run = AgentRun(
+            agent_id=agent_model.id,
+            status='running',
+            started_at=datetime.utcnow(),
+            manual=False,  # Triggered by event propagation
+            input_event_ids=[e.id for e in events]
+        )
+        self.db_session.add(agent_run)
+        self.db_session.flush()  # Get the agent_run.id
 
         # Create agent instance
         try:
@@ -223,14 +245,10 @@ class EventService:
             )
         except Exception as e:
             logger.error(f'Failed to create agent {agent_model.id}: {e}')
-            return []
-
-        # Check if agent can receive events
-        if not agent.can_receive_events:
-            logger.warning(
-                f'Agent {agent_model.id} ({agent_model.job_type}) '
-                f'cannot receive events, skipping'
-            )
+            agent_run.status = 'failed'
+            agent_run.completed_at = datetime.utcnow()
+            agent_run.error_message = str(e)
+            self.db_session.commit()
             return []
 
         # Execute agent with events
@@ -247,7 +265,20 @@ class EventService:
 
                     # Add to session (will update if exists, insert if new)
                     self.db_session.add(event)
-                self.db_session.commit()
+                self.db_session.flush()  # Get event IDs
+
+                # Update agent_run with output event IDs
+                agent_run.output_event_ids = [e.id for e in new_events]
+
+            # Mark run as completed
+            agent_run.status = 'completed'
+            agent_run.completed_at = datetime.utcnow()
+            self.db_session.commit()
+
+            logger.info(
+                f'Agent {agent_model.id} executed via propagation: '
+                f'{len(events)} input events -> {len(new_events) if new_events else 0} output events'
+            )
 
             return new_events if new_events else []
 
@@ -256,7 +287,11 @@ class EventService:
                 f'Error processing events in agent {agent_model.id}: {e}',
                 exc_info=True
             )
-            self.db_session.rollback()
+            # Mark run as failed
+            agent_run.status = 'failed'
+            agent_run.completed_at = datetime.utcnow()
+            agent_run.error_message = str(e)
+            self.db_session.commit()
             return []
 
     def get_agent_network_stats(self, agent_id: int) -> Dict[str, Any]:

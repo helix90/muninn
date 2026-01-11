@@ -8,33 +8,33 @@
         <div class="flex justify-between items-start">
             <div>
                 <div class="flex items-center space-x-3 mb-2">
-                    <h1 class="text-3xl font-bold text-gray-900">{{ agent.name }}</h1>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ agent.name }}</h1>
                     {% if agent.is_active %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                         Active
                     </span>
                     {% else %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                         Inactive
                     </span>
                     {% endif %}
                 </div>
-                <div class="flex items-center space-x-4 text-sm text-gray-500">
+                <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                     <span>Type: {{ agent.job_type|replace('_', ' ')|title }}</span>
                     <span>Created: {{ agent.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                 </div>
             </div>
             <div class="flex space-x-3">
-                <a href="{{ url_for('agents.pipeline') }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                <a href="{{ url_for('agents.pipeline') }}" class="bg-purple-600 dark:bg-purple-500 hover:bg-purple-700 dark:hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
                     View Pipeline
                 </a>
-                <button onclick="runAgent()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                <button onclick="runAgent()" class="bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
                     Run Now
                 </button>
-                <a href="{{ url_for('agents.edit_agent', agent_id=agent.id) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <a href="{{ url_for('agents.edit_agent', agent_id=agent.id) }}" class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
                     Edit
                 </a>
-                <a href="{{ url_for('agents.agent_list') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                <a href="{{ url_for('agents.agent_list') }}" class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-bold py-2 px-4 rounded">
                     Back to List
                 </a>
             </div>
@@ -43,39 +43,39 @@
 
     <!-- Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="text-sm text-gray-500 mb-1">Total Runs</div>
-            <div class="text-2xl font-bold text-gray-900">{{ stats.total_runs }}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Runs</div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total_runs }}</div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="text-sm text-gray-500 mb-1">Success Rate</div>
-            <div class="text-2xl font-bold text-green-600">{{ "%.1f"|format(stats.success_rate) }}%</div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Success Rate</div>
+            <div class="text-2xl font-bold text-green-600 dark:text-green-500">{{ "%.1f"|format(stats.success_rate) }}%</div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="text-sm text-gray-500 mb-1">Events Created</div>
-            <div class="text-2xl font-bold text-blue-600">{{ stats.total_events_created }}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Events Created</div>
+            <div class="text-2xl font-bold text-blue-600 dark:text-blue-500">{{ stats.total_events_created }}</div>
         </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="text-sm text-gray-500 mb-1">Failed Runs</div>
-            <div class="text-2xl font-bold text-red-600">{{ stats.failed_runs }}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Failed Runs</div>
+            <div class="text-2xl font-bold text-red-600 dark:text-red-500">{{ stats.failed_runs }}</div>
         </div>
     </div>
 
     <!-- Agent Configuration -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Configuration</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Configuration</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% if agent.schedule_cron %}
             <div>
-                <div class="text-sm font-medium text-gray-700">Schedule</div>
-                <div class="text-sm text-gray-900 mt-1">
+                <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Schedule</div>
+                <div class="text-sm text-gray-900 dark:text-gray-100 mt-1">
                     {{ agent.schedule_cron }}
                     {% if agent.schedule_enabled %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 ml-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
                         Enabled
                     </span>
                     {% else %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 ml-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 ml-2">
                         Disabled
                     </span>
                     {% endif %}
@@ -85,8 +85,8 @@
             {% if agent.config %}
                 {% for key, value in agent.config.items() %}
                 <div>
-                    <div class="text-sm font-medium text-gray-700">{{ key|replace('_', ' ')|title }}</div>
-                    <div class="text-sm text-gray-900 mt-1">
+                    <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ key|replace('_', ' ')|title }}</div>
+                    <div class="text-sm text-gray-900 dark:text-gray-100 mt-1">
                         {% if value is string %}
                             {% if value|length > 100 %}
                                 {{ value[:100] }}...
@@ -104,26 +104,26 @@
     </div>
 
     <!-- Agent Capabilities -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Capabilities</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Capabilities</h2>
         <div class="flex flex-wrap gap-2">
             {% if capabilities.can_be_scheduled %}
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                 Can be scheduled
             </span>
             {% endif %}
             {% if capabilities.can_receive_events %}
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                 Can receive events
             </span>
             {% endif %}
             {% if capabilities.can_create_events %}
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 Can create events
             </span>
             {% endif %}
             {% if capabilities.requires_input %}
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                 Requires input events
             </span>
             {% endif %}
@@ -131,65 +131,65 @@
     </div>
 
     <!-- Network Connections -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Network Connections</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Network Connections</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Upstream Agents -->
             <div>
-                <h3 class="text-lg font-medium text-gray-800 mb-3">
+                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">
                     Upstream Agents
-                    <span class="text-sm text-gray-500">({{ upstream_links|length }})</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">({{ upstream_links|length }})</span>
                 </h3>
                 {% if upstream_links %}
                 <ul class="space-y-2">
                     {% for link in upstream_links %}
-                    <li class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <li class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
                         <a href="{{ url_for('agents.agent_detail', agent_id=link.source_agent.id) }}"
-                           class="text-blue-600 hover:text-blue-900">
+                           class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
                             {{ link.source_agent.name }}
                         </a>
                         <button onclick="deleteLink({{ link.id }})"
-                                class="text-red-600 hover:text-red-900 text-sm">
+                                class="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 text-sm">
                             Remove
                         </button>
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
-                <p class="text-gray-500 text-sm">No upstream agents</p>
+                <p class="text-gray-500 dark:text-gray-400 text-sm">No upstream agents</p>
                 {% endif %}
             </div>
 
             <!-- Downstream Agents -->
             <div>
-                <h3 class="text-lg font-medium text-gray-800 mb-3">
+                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">
                     Downstream Agents
-                    <span class="text-sm text-gray-500">({{ downstream_links|length }})</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">({{ downstream_links|length }})</span>
                 </h3>
                 {% if downstream_links %}
                 <ul class="space-y-2">
                     {% for link in downstream_links %}
-                    <li class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <li class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
                         <a href="{{ url_for('agents.agent_detail', agent_id=link.target_agent.id) }}"
-                           class="text-blue-600 hover:text-blue-900">
+                           class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
                             {{ link.target_agent.name }}
                         </a>
                         <button onclick="deleteLink({{ link.id }})"
-                                class="text-red-600 hover:text-red-900 text-sm">
+                                class="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 text-sm">
                             Remove
                         </button>
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
-                <p class="text-gray-500 text-sm">No downstream agents</p>
+                <p class="text-gray-500 dark:text-gray-400 text-sm">No downstream agents</p>
                 {% endif %}
 
                 <!-- Add Downstream Agent Button -->
                 {% if capabilities.can_create_events %}
                 <div class="mt-4">
-                    <button onclick="openAddDownstreamModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm">
+                    <button onclick="openAddDownstreamModal()" class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-2 px-4 rounded text-sm">
                         + Add Downstream Agent
                     </button>
                 </div>
@@ -198,19 +198,19 @@
         </div>
 
         <!-- Network Statistics -->
-        <div class="mt-6 pt-6 border-t border-gray-200">
+        <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                    <div class="text-sm text-gray-500">Upstream Connections</div>
-                    <div class="text-lg font-semibold text-gray-900">{{ network_stats.upstream_agents }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Upstream Connections</div>
+                    <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ network_stats.upstream_agents }}</div>
                 </div>
                 <div>
-                    <div class="text-sm text-gray-500">Downstream Connections</div>
-                    <div class="text-lg font-semibold text-gray-900">{{ network_stats.downstream_agents }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Downstream Connections</div>
+                    <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ network_stats.downstream_agents }}</div>
                 </div>
                 <div>
-                    <div class="text-sm text-gray-500">Network Position</div>
-                    <div class="text-lg font-semibold text-gray-900">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Network Position</div>
+                    <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {% if network_stats.is_source %}Source{% elif network_stats.is_terminal %}Terminal{% else %}Middle{% endif %}
                     </div>
                 </div>
@@ -219,37 +219,37 @@
     </div>
 
     <!-- Execution History -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Recent Executions</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Executions</h2>
         {% if runs %}
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Started
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Duration
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Status
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Events
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Type
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for run in runs %}
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                             {{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {% if run.completed_at %}
                                 {{ ((run.completed_at - run.started_at).total_seconds())|round(2) }}s
                             {% else %}
@@ -258,27 +258,27 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if run.status == 'completed' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Completed
                             </span>
                             {% elif run.status == 'failed' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                                 Failed
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                 {{ run.status|title }}
                             </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {% if run.output_event_ids %}
                                 {{ run.output_event_ids|length }}
                             {% else %}
                                 0
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {% if run.manual %}Manual{% else %}Scheduled{% endif %}
                         </td>
                     </tr>
@@ -287,55 +287,55 @@
             </table>
         </div>
         {% else %}
-        <p class="text-gray-500">No execution history yet</p>
+        <p class="text-gray-500 dark:text-gray-400">No execution history yet</p>
         {% endif %}
     </div>
 
     <!-- Recent Events -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Recent Events</h2>
-            <a href="{{ url_for('events.agent_events', agent_id=agent.id) }}" class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Events</h2>
+            <a href="{{ url_for('events.agent_events', agent_id=agent.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 text-sm font-medium">
                 View All Events →
             </a>
         </div>
         {% if recent_events %}
         <div class="space-y-3">
             {% for event in recent_events %}
-            <div class="border border-gray-200 rounded-lg p-4">
+            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <div class="flex justify-between items-start mb-2">
                     <div class="flex-1">
-                        <div class="text-sm font-medium text-gray-900">
+                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
                             Event #{{ event.id }}
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {{ event.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
                         </div>
                     </div>
                     <button onclick="togglePayload({{ event.id }})"
-                            class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                            class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 text-sm font-medium">
                         Show Payload
                     </button>
                 </div>
-                <div id="payload-{{ event.id }}" class="hidden mt-3 pt-3 border-t border-gray-200">
-                    <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">{{ event.payload|tojson(indent=2) }}</pre>
+                <div id="payload-{{ event.id }}" class="hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <pre class="text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto">{{ event.payload|tojson(indent=2) }}</pre>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500">No events yet</p>
+        <p class="text-gray-500 dark:text-gray-400">No events yet</p>
         {% endif %}
     </div>
 
     <!-- Danger Zone -->
-    <div class="bg-white rounded-lg shadow-md p-6 border-2 border-red-200">
-        <h2 class="text-xl font-semibold text-red-700 mb-4">Danger Zone</h2>
-        <p class="text-sm text-gray-600 mb-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-2 border-red-200 dark:border-red-900">
+        <h2 class="text-xl font-semibold text-red-700 dark:text-red-500 mb-4">Danger Zone</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Deleting this agent will remove all its execution history and break any connected workflows.
         </p>
         <button onclick="deleteAgent()"
-                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                class="bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
             Delete Agent
         </button>
     </div>
@@ -344,18 +344,18 @@
 <!-- Delete Agent Modal -->
 <div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen">
-        <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Delete Agent</h3>
-            <p class="text-gray-500 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Delete Agent</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">
                 Are you sure you want to delete "{{ agent.name }}"? This action cannot be undone.
             </p>
             <div class="flex justify-end space-x-3">
                 <button onclick="closeDeleteModal()"
-                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-bold py-2 px-4 rounded">
                     Cancel
                 </button>
                 <button onclick="confirmDelete()"
-                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        class="bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
                     Delete
                 </button>
             </div>
@@ -366,12 +366,12 @@
 <!-- Run Result Modal -->
 <div id="runResultModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen">
-        <div class="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Agent Run Result</h3>
-            <div id="runResultContent" class="text-gray-700 mb-6"></div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Agent Run Result</h3>
+            <div id="runResultContent" class="text-gray-700 dark:text-gray-300 mb-6"></div>
             <div class="flex justify-end">
                 <button onclick="closeRunResultModal()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
                     OK
                 </button>
             </div>
@@ -382,20 +382,20 @@
 <!-- Add Downstream Agent Modal -->
 <div id="addDownstreamModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen">
-        <div class="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Link Downstream Agent</h3>
-            <p class="text-sm text-gray-500 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Link Downstream Agent</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Select an agent to receive events from {{ agent.name }}.
             </p>
             <form id="addDownstreamForm" method="POST" action="{{ url_for('agents.create_link') }}">
                 <input type="hidden" name="source_agent_id" value="{{ agent.id }}">
 
                 <div class="mb-4">
-                    <label for="target_agent_id" class="block text-sm font-medium text-gray-700 mb-2">
+                    <label for="target_agent_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Target Agent
                     </label>
                     <select id="target_agent_id" name="target_agent_id" required
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Select an agent...</option>
                         {% if available_agents %}
                             {% for available_agent in available_agents %}
@@ -405,18 +405,18 @@
                             {% endfor %}
                         {% endif %}
                     </select>
-                    <p class="mt-2 text-xs text-gray-500">
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         Only agents that can receive events are shown.
                     </p>
                 </div>
 
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="closeAddDownstreamModal()"
-                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                            class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-bold py-2 px-4 rounded">
                         Cancel
                     </button>
                     <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
                         Create Link
                     </button>
                 </div>

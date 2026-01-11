@@ -7,13 +7,55 @@
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <!-- Theme initialization - prevents FOUC -->
+    <script>
+        (function() {
+            const serverTheme = {{ current_user.theme_preference|tojson if current_user.is_authenticated else 'null' }};
+
+            function getStoredTheme() {
+                if (serverTheme) {
+                    localStorage.setItem('theme', serverTheme);
+                    return serverTheme;
+                }
+                return localStorage.getItem('theme');
+            }
+
+            function getSystemTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            function getPreferredTheme() {
+                const stored = getStoredTheme();
+                if (stored === 'system' || !stored) {
+                    return getSystemTheme();
+                }
+                return stored;
+            }
+
+            const theme = getPreferredTheme();
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
     <!-- Custom CSS -->
     <style>
+        /* Smooth dark mode transitions */
+        body, nav, footer, main {
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
         .flash-message {
             animation: slideIn 0.3s ease-out;
         }
-        
+
         @keyframes slideIn {
             from {
                 transform: translateY(-100%);
@@ -26,45 +68,62 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-white shadow-lg">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between h-16">
                 <div class="flex">
                     <div class="flex-shrink-0 flex items-center">
-                        <a href="{{ url_for('main.index') }}" class="text-xl font-bold text-gray-900">
+                        <a href="{{ url_for('main.index') }}" class="text-xl font-bold text-gray-900 dark:text-gray-100">
                             Muninn
                         </a>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
                         <a href="{{ url_for('main.index') }}"
-                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Dashboard
                         </a>
                         <a href="{{ url_for('agents.agent_list') }}"
-                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Agents
                         </a>
                         <a href="{{ url_for('agents.pipeline') }}"
-                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Pipeline
                         </a>
                         <a href="{{ url_for('events.all_events') }}"
-                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Events
                         </a>
                         <a href="{{ url_for('scheduler.scheduler_dashboard') }}"
-                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Scheduler
                         </a>
                     </div>
                 </div>
                 
                 <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                    <!-- Theme toggle button -->
+                    <button id="theme-toggle"
+                            class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors mr-3"
+                            aria-label="Toggle dark mode"
+                            title="Toggle theme">
+                        <!-- Sun icon (shown in dark mode) -->
+                        <svg id="theme-toggle-sun" class="hidden h-5 w-5 text-gray-700 dark:text-gray-300"
+                             fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+                        </svg>
+                        <!-- Moon icon (shown in light mode) -->
+                        <svg id="theme-toggle-moon" class="h-5 w-5 text-gray-700 dark:text-gray-300"
+                             fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                        </svg>
+                    </button>
+
                     <!-- User menu placeholder -->
                     <div class="ml-3 relative">
-                        <div class="text-sm text-gray-500">
+                        <div class="text-sm text-gray-500 dark:text-gray-400">
                             Welcome to Muninn
                         </div>
                     </div>
@@ -78,22 +137,22 @@
         {% if messages %}
             <div class="max-w-7xl mx-auto px-4 py-2">
                 {% for category, message in messages %}
-                    <div class="flash-message mb-2 p-4 rounded-md 
-                        {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700
-                        {% elif category == 'success' %}bg-green-100 border border-green-400 text-green-700
-                        {% else %}bg-blue-100 border border-blue-400 text-blue-700{% endif %}">
+                    <div class="flash-message mb-2 p-4 rounded-md
+                        {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-200
+                        {% elif category == 'success' %}bg-green-100 border border-green-400 text-green-700 dark:bg-green-900 dark:border-green-700 dark:text-green-200
+                        {% else %}bg-blue-100 border border-blue-400 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200{% endif %}">
                         <div class="flex">
                             <div class="flex-shrink-0">
                                 {% if category == 'error' %}
-                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg class="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
                                     </svg>
                                 {% elif category == 'success' %}
-                                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg class="h-5 w-5 text-green-400 dark:text-green-300" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                     </svg>
                                 {% else %}
-                                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg class="h-5 w-5 text-blue-400 dark:text-blue-300" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
                                     </svg>
                                 {% endif %}
@@ -114,9 +173,9 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-16">
+    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-16">
         <div class="max-w-7xl mx-auto py-6 px-4">
-            <div class="text-center text-sm text-gray-500">
+            <div class="text-center text-sm text-gray-500 dark:text-gray-400">
                 <p>&copy; 2024 Muninn. All rights reserved.</p>
             </div>
         </div>
@@ -137,7 +196,80 @@
             });
         });
     </script>
-    
+
+    <!-- Theme toggle JavaScript -->
+    <script>
+        // Theme management
+        (function() {
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const sunIcon = document.getElementById('theme-toggle-sun');
+            const moonIcon = document.getElementById('theme-toggle-moon');
+
+            function setTheme(theme) {
+                const isDark = theme === 'dark' ||
+                              (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
+                }
+            }
+
+            function toggleTheme() {
+                const currentTheme = localStorage.getItem('theme') || 'system';
+                let newTheme;
+
+                // Cycle: light → dark → system
+                if (currentTheme === 'light') {
+                    newTheme = 'dark';
+                } else if (currentTheme === 'dark') {
+                    newTheme = 'system';
+                } else {
+                    newTheme = 'light';
+                }
+
+                localStorage.setItem('theme', newTheme);
+                setTheme(newTheme);
+
+                // Sync with server if user is authenticated
+                syncThemeWithServer(newTheme);
+            }
+
+            function syncThemeWithServer(theme) {
+                fetch('/api/user/theme', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ theme: theme })
+                }).catch(err => {
+                    console.debug('Theme sync failed (user may not be authenticated):', err);
+                });
+            }
+
+            // Initialize theme on page load
+            const currentTheme = localStorage.getItem('theme') || 'system';
+            setTheme(currentTheme);
+
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (localStorage.getItem('theme') === 'system') {
+                    setTheme('system');
+                }
+            });
+
+            // Toggle button click handler
+            if (themeToggleBtn) {
+                themeToggleBtn.addEventListener('click', toggleTheme);
+            }
+        })();
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

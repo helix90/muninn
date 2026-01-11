@@ -3,7 +3,7 @@ Authentication views for Muninn application
 """
 
 import logging
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from app.auth import auth
 from app.auth.forms import LoginForm, RegistrationForm
@@ -84,3 +84,32 @@ def logout():
     logger.info(f'User {username} logged out')
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('auth.login'))
+
+
+@auth.route('/api/user/theme', methods=['POST'])
+@login_required
+def update_theme():
+    """API endpoint to update user theme preference."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        theme = data.get('theme')
+
+        # Validate theme value
+        valid_themes = ['light', 'dark', 'system', None]
+        if theme not in valid_themes:
+            return jsonify({'error': 'Invalid theme value. Must be "light", "dark", "system", or null'}), 400
+
+        # Update user theme preference
+        current_user.theme_preference = theme
+        db.session.commit()
+
+        logger.info(f'User {current_user.username} updated theme preference to: {theme}')
+        return jsonify({'success': True, 'theme': theme}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error updating theme preference: {e}')
+        return jsonify({'error': 'Failed to update theme preference'}), 500

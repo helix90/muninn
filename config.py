@@ -14,6 +14,14 @@ class Config:
     LOG_LEVEL = env_config('LOG_LEVEL', default='INFO')
     LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
+    # SMTP Configuration (Global)
+    SMTP_SERVER = env_config('SMTP_SERVER', default=None)
+    SMTP_PORT = env_config('SMTP_PORT', default=587, cast=int)
+    SMTP_USE_TLS = env_config('SMTP_USE_TLS', default=True, cast=bool)
+    SMTP_USERNAME = env_config('SMTP_USERNAME', default=None)
+    SMTP_PASSWORD = env_config('SMTP_PASSWORD', default=None)
+    SMTP_FROM_EMAIL = env_config('SMTP_FROM_EMAIL', default=None)
+
     # Database configuration
     DATABASE_URL = env_config('DATABASE_URL', default='postgresql://muninn:muninn_pass@localhost:5432/muninn_dev')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL

@@ -204,14 +204,12 @@ dedupe_agent = Job(
 )
 
 # 4. Email Agent - Send notifications
+# (SMTP settings are configured globally via environment variables)
 email_agent = Job(
     name='Email Notifier',
     job_type='email_agent',
     config={
-        'smtp_server': 'smtp.gmail.com',
-        'smtp_port': 587,
-        'username': 'alerts@example.com',
-        'password': 'app_password',
+        'to_email': 'user@example.com',
         'subject_template': 'New Python Article: {{ title }}',
         'body_template': '{{ title }}\n\n{{ link }}\n\n{{ summary }}'
     }
@@ -397,12 +395,85 @@ Muninn uses **python-decouple** for configuration management, which automaticall
 | `DB_POOL_TIMEOUT` | Database connection timeout | `20` |
 | `DB_POOL_RECYCLE` | Database connection recycle time | `3600` |
 | `DB_MAX_OVERFLOW` | Database max overflow connections | `20` |
+| `SMTP_SERVER` | SMTP server hostname (required for email agents) | None |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USE_TLS` | Use TLS encryption (STARTTLS) | `True` |
+| `SMTP_USERNAME` | SMTP authentication username (required) | None |
+| `SMTP_PASSWORD` | SMTP authentication password (required) | None |
+| `SMTP_FROM_EMAIL` | Default sender email address | Uses `SMTP_USERNAME` if not set |
 
 ### Configuration Classes
 
 - **DevelopmentConfig**: Debug enabled, detailed logging, SQL query logging
 - **TestingConfig**: Testing environment, debug enabled, minimal connection pool
 - **ProductionConfig**: Production optimized, security enabled, connection health checks
+
+### SMTP Configuration for Email Agents
+
+Email agents require global SMTP configuration to send emails. SMTP settings are configured once via environment variables and shared across all email agents.
+
+#### Setup with Gmail
+
+1. **Enable 2-Factor Authentication** on your Gmail account
+2. **Generate an App Password**:
+   - Visit https://myaccount.google.com/apppasswords
+   - Select "Mail" and your device
+   - Copy the 16-character password
+3. **Configure Environment Variables** in `.env`:
+
+```bash
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=True
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-16-char-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+```
+
+#### Setup with Other Providers
+
+**Office 365 / Outlook**:
+```bash
+SMTP_SERVER=smtp.office365.com
+SMTP_PORT=587
+SMTP_USE_TLS=True
+```
+
+**SendGrid**:
+```bash
+SMTP_SERVER=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USE_TLS=True
+SMTP_USERNAME=apikey
+SMTP_PASSWORD=your-sendgrid-api-key
+```
+
+**Mailgun**:
+```bash
+SMTP_SERVER=smtp.mailgun.org
+SMTP_PORT=587
+SMTP_USE_TLS=True
+```
+
+#### Email Agent Configuration
+
+Once SMTP is configured globally, email agents only need recipient and template configuration:
+
+```python
+{
+  "to_email": "alerts@example.com",
+  "subject_template": "Alert: {{ title }}",
+  "body_template": "{{ description }}\n\nLink: {{ link }}"
+}
+```
+
+#### Security Best Practices
+
+- Never commit `.env` files to version control
+- Use App Passwords instead of account passwords
+- Rotate SMTP credentials regularly
+- Use environment-specific accounts (dev, staging, production)
+- Consider using dedicated email services (SendGrid, Mailgun) for production
 
 ## 📡 API Endpoints
 

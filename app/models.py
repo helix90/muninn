@@ -30,6 +30,7 @@ class User(UserMixin, db.Model):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    theme_preference = Column(String(10), nullable=True)  # 'light', 'dark', 'system', or NULL
     
     # Relationships
     jobs = relationship('Job', back_populates='user', cascade='all, delete-orphan')

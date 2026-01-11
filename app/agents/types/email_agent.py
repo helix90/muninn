@@ -44,43 +44,16 @@ class EmailAgent(ActionAgent):
         """Validate email agent configuration."""
         super().validate_config()
 
-        # Required SMTP settings
-        if 'smtp_server' not in self.config:
-            raise ValueError("Email agent requires 'smtp_server' in config")
+        # Check global SMTP configuration is set
+        from flask import current_app
+        if not current_app.config.get('SMTP_SERVER'):
+            raise ValueError("Global SMTP_SERVER not configured. Set SMTP_SERVER environment variable.")
+        if not current_app.config.get('SMTP_USERNAME'):
+            raise ValueError("Global SMTP_USERNAME not configured. Set SMTP_USERNAME environment variable.")
+        if not current_app.config.get('SMTP_PASSWORD'):
+            raise ValueError("Global SMTP_PASSWORD not configured. Set SMTP_PASSWORD environment variable.")
 
-        if not isinstance(self.config['smtp_server'], str):
-            raise ValueError("'smtp_server' must be a string")
-
-        # Optional SMTP port
-        smtp_port = self.config.get('smtp_port', 587)
-        if not isinstance(smtp_port, int) or smtp_port <= 0 or smtp_port > 65535:
-            raise ValueError("'smtp_port' must be a valid port number (1-65535)")
-
-        # Optional use_tls
-        if 'use_tls' in self.config:
-            if not isinstance(self.config['use_tls'], bool):
-                raise ValueError("'use_tls' must be a boolean")
-
-        # Authentication credentials
-        if 'username' not in self.config:
-            raise ValueError("Email agent requires 'username' in config")
-
-        if not isinstance(self.config['username'], str):
-            raise ValueError("'username' must be a string")
-
-        if 'password' not in self.config:
-            raise ValueError("Email agent requires 'password' in config")
-
-        if not isinstance(self.config['password'], str):
-            raise ValueError("'password' must be a string")
-
-        # Email addresses
-        if 'from_email' not in self.config:
-            raise ValueError("Email agent requires 'from_email' in config")
-
-        if not isinstance(self.config['from_email'], str):
-            raise ValueError("'from_email' must be a string")
-
+        # Recipient validation (to_email required)
         if 'to_email' not in self.config:
             raise ValueError("Email agent requires 'to_email' in config")
 
@@ -140,12 +113,17 @@ class EmailAgent(ActionAgent):
         Args:
             events: Events to process
         """
-        smtp_server = self.config['smtp_server']
-        smtp_port = self.config.get('smtp_port', 587)
-        use_tls = self.config.get('use_tls', True)
-        username = self.config['username']
-        password = self.config['password']
-        from_email = self.config['from_email']
+        from flask import current_app
+
+        # Get SMTP settings from global config
+        smtp_server = current_app.config['SMTP_SERVER']
+        smtp_port = current_app.config.get('SMTP_PORT', 587)
+        use_tls = current_app.config.get('SMTP_USE_TLS', True)
+        username = current_app.config['SMTP_USERNAME']
+        password = current_app.config['SMTP_PASSWORD']
+        from_email = current_app.config.get('SMTP_FROM_EMAIL', username)  # Default to username if not set
+
+        # Get per-agent settings
         html = self.config.get('html', False)
 
         sent_count = 0
@@ -302,27 +280,11 @@ class EmailAgent(ActionAgent):
         """Get configuration schema for email agent."""
         schema = super().get_config_schema()
         schema['required_fields'] = [
-            'smtp_server',
-            'username',
-            'password',
-            'from_email',
             'to_email',
             'subject_template',
             'body_template'
         ]
         schema['optional_fields'] = [
-            {
-                'name': 'smtp_port',
-                'type': 'integer',
-                'default': 587,
-                'description': 'SMTP server port (587 for TLS, 465 for SSL, 25 for plain)'
-            },
-            {
-                'name': 'use_tls',
-                'type': 'boolean',
-                'default': True,
-                'description': 'Use TLS encryption (STARTTLS)'
-            },
             {
                 'name': 'cc_email',
                 'type': 'string or list',
@@ -340,6 +302,10 @@ class EmailAgent(ActionAgent):
                 'description': 'Send email as HTML (includes both plain text and HTML versions)'
             }
         ]
+        schema['global_config_note'] = (
+            'SMTP server configuration is managed globally via environment variables: '
+            'SMTP_SERVER, SMTP_PORT, SMTP_USE_TLS, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL'
+        )
         schema['template_context'] = {
             'description': 'Templates have access to all event payload fields',
             'example_subject': 'New alert: {{ title }}',

@@ -6,35 +6,35 @@
 <div class="max-w-7xl mx-auto px-4 py-6">
     <!-- Header -->
     <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">Agent Pipeline Visualization</h1>
-        <p class="mt-2 text-sm text-gray-600">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Agent Pipeline Visualization</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Visual representation of your agent connections and event flow.
         </p>
     </div>
 
     <!-- Graph Container -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div id="cy" class="w-full border border-gray-300 rounded" style="height: 600px;"></div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div id="cy" class="w-full border border-gray-300 dark:border-gray-700 rounded" style="height: 600px;"></div>
     </div>
 
     <!-- Legend -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Legend</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Legend</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="flex items-center">
                 <div class="w-5 h-5 rounded-full bg-green-500 mr-3"></div>
-                <span class="text-sm text-gray-700">Source Agent (creates events)</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Source Agent (creates events)</span>
             </div>
             <div class="flex items-center">
                 <div class="w-5 h-5 rounded-full bg-blue-500 mr-3"></div>
-                <span class="text-sm text-gray-700">Transform Agent (processes events)</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Transform Agent (processes events)</span>
             </div>
             <div class="flex items-center">
                 <div class="w-5 h-5 rounded-full bg-orange-500 mr-3"></div>
-                <span class="text-sm text-gray-700">Action Agent (executes actions)</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Action Agent (executes actions)</span>
             </div>
         </div>
-        <div class="mt-4 text-sm text-gray-600">
+        <div class="mt-4 text-sm text-gray-600 dark:text-gray-400">
             <p><strong>Tip:</strong> Click on any agent to view its details.</p>
         </div>
     </div>

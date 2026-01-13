@@ -91,11 +91,29 @@ class AgentService:
         }
 
         try:
-            # Create agent instance
+            # Resolve credentials in config before passing to agent
+            from app.services.credential_service import CredentialService
+            credential_service = CredentialService(self.db_session)
+
+            try:
+                resolved_config = credential_service.resolve_credentials_in_config(
+                    agent_model.config,
+                    agent_model.user_id
+                )
+            except ValueError as e:
+                logger.error(f"Failed to resolve credentials for agent {agent_id}: {e}")
+                result['error'] = f"Credential resolution failed: {str(e)}"
+                agent_run.status = 'failed'
+                agent_run.error_message = result['error']
+                agent_run.completed_at = datetime.utcnow()
+                self.db_session.commit()
+                return result
+
+            # Create agent instance with resolved config
             agent = agent_registry.create_agent(
                 agent_type=agent_model.job_type,
                 agent_id=agent_model.id,
-                config=agent_model.config,
+                config=resolved_config,  # Use resolved config
                 user_id=agent_model.user_id,
                 db_session=self.db_session
             )

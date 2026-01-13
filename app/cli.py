@@ -372,6 +372,176 @@ def encrypt_credentials_command():
         raise click.Abort()
 
 
+@click.command('migrate-credentials')
+@click.option('--dry-run', is_flag=True, help='Preview changes without applying')
+@click.option('--agent-id', type=int, help='Migrate specific agent only')
+@with_appcontext
+def migrate_credentials_command(dry_run, agent_id):
+    """Migrate plaintext credentials from agent configs to encrypted credential vault.
+
+    This command scans agent configurations for plaintext credential values
+    (passwords, API keys, tokens, etc.), creates encrypted Credential records,
+    and updates the agent configs to use {{credential:name}} references.
+    """
+    try:
+        from app.models import Job, User
+        from app.services.credential_service import CredentialService
+        from app.utils.encryption import ConfigEncryption
+        import re
+
+        # Patterns to detect secret fields
+        SECRET_FIELD_PATTERNS = [
+            'password', 'passwd', 'pwd',
+            'api_key', 'apikey', 'api_token', 'token',
+            'secret', 'credential', 'credentials',
+            'auth', 'authorization', 'auth_token',
+            'access_key', 'private_key'
+        ]
+
+        if dry_run:
+            click.echo('🎭 DRY RUN MODE - No changes will be made\n')
+
+        click.echo('🔍 Scanning agents for plaintext credentials...\n')
+
+        # Query agents
+        query = db.session.query(Job)
+        if agent_id:
+            query = query.filter_by(id=agent_id)
+
+        agents = query.all()
+        migrated_count = 0
+        skipped_count = 0
+        total_creds_created = 0
+
+        for agent in agents:
+            user = db.session.query(User).get(agent.user_id)
+            if not user:
+                click.echo(f'⚠️  Agent {agent.id}: User not found, skipping')
+                skipped_count += 1
+                continue
+
+            # Find secret fields in config
+            secrets_found = []
+
+            def find_secrets(obj, path=''):
+                """Recursively search for credential-like fields"""
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        current_path = f"{path}.{key}" if path else key
+
+                        # Check if key matches secret pattern
+                        key_lower = key.lower()
+                        if any(pattern in key_lower for pattern in SECRET_FIELD_PATTERNS):
+                            # Check if value is a non-empty string and not already a credential reference
+                            if isinstance(value, str) and value and not value.startswith('{{credential:'):
+                                secrets_found.append((current_path, key, value))
+                                continue
+
+                        # Recurse for nested objects
+                        find_secrets(value, current_path)
+                elif isinstance(obj, list):
+                    for i, item in enumerate(obj):
+                        find_secrets(item, f"{path}[{i}]")
+
+            find_secrets(agent.config)
+
+            if not secrets_found:
+                continue
+
+            click.echo(f'📋 Agent {agent.id} ({agent.name}) - User: {user.username}')
+            click.echo(f'   Found {len(secrets_found)} potential credential(s):')
+
+            service = CredentialService()
+            new_config = json.loads(json.dumps(agent.config))  # Deep copy
+
+            for path, key, value in secrets_found:
+                # Generate credential name
+                # Replace dots and brackets to make valid credential name
+                safe_path = re.sub(r'[.\[\]]', '_', path)
+                cred_name = f"agent_{agent.id}_{safe_path}".lower()
+
+                # Truncate if too long
+                if len(cred_name) > 90:
+                    cred_name = cred_name[:90]
+
+                # Mask value for display
+                masked_value = ConfigEncryption.mask_credential_value(value)
+
+                click.echo(f'   - {path}: {masked_value}')
+
+                if not dry_run:
+                    # Create credential
+                    try:
+                        existing = service.get_credential(user.id, cred_name)
+                        if existing:
+                            click.echo(f'      ⚠️  Credential "{cred_name}" already exists, skipping')
+                            # Still update config to reference it
+                            new_config = update_config_value(new_config, path, f"{{{{credential:{cred_name}}}}}")
+                        else:
+                            service.create_credential(
+                                user_id=user.id,
+                                name=cred_name,
+                                value=value,
+                                description=f"Migrated from agent {agent.id} ({agent.name}) - field: {path}"
+                            )
+                            total_creds_created += 1
+
+                            # Update config
+                            new_config = update_config_value(new_config, path, f"{{{{credential:{cred_name}}}}}")
+
+                            click.echo(f'      → Created credential: {cred_name}')
+                    except Exception as e:
+                        click.echo(f'      ❌ Error: {e}')
+                else:
+                    click.echo(f'      [DRY RUN] Would create credential: {cred_name}')
+
+            if not dry_run and secrets_found:
+                # Update agent config
+                agent.config = new_config
+                db.session.commit()
+                migrated_count += 1
+                click.echo(f'   ✅ Agent config updated\n')
+            elif dry_run:
+                click.echo(f'   [DRY RUN] Would create {len(secrets_found)} credential(s)\n')
+
+        click.echo(f'\n{"🎭 DRY RUN COMPLETE" if dry_run else "✅ MIGRATION COMPLETE"}')
+        click.echo(f'Agents migrated: {migrated_count}')
+        if not dry_run:
+            click.echo(f'Credentials created: {total_creds_created}')
+        click.echo(f'Agents skipped: {skipped_count}')
+
+        if dry_run:
+            click.echo('\nRun without --dry-run to apply changes')
+
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f'Error during migration: {e}', err=True)
+        raise click.Abort()
+
+
+def update_config_value(config, path, new_value):
+    """Update a nested config value given a path like 'headers.Authorization' or 'items[0].key'"""
+    import re
+
+    # Parse path into parts
+    parts = []
+    for part in re.split(r'\.|\[|\]', path):
+        if part:
+            # Try to convert to int for array indices
+            try:
+                parts.append(int(part))
+            except ValueError:
+                parts.append(part)
+
+    # Navigate to parent and update
+    current = config
+    for part in parts[:-1]:
+        current = current[part]
+
+    current[parts[-1]] = new_value
+    return config
+
+
 def register_commands(app):
     """Register CLI commands with the Flask app."""
     app.cli.add_command(init_db_command)
@@ -383,4 +553,5 @@ def register_commands(app):
     app.cli.add_command(scheduler_start_command)
     app.cli.add_command(scheduler_stop_command)
     app.cli.add_command(migrate_scheduler_jobs_command)
-    app.cli.add_command(encrypt_credentials_command) 
+    app.cli.add_command(encrypt_credentials_command)
+    app.cli.add_command(migrate_credentials_command) 

@@ -195,12 +195,47 @@ def test_user(app):
 
 
 @pytest.fixture
+def test_user2(app):
+    """Create a second test user for multi-user tests."""
+    from app.models import User
+
+    with app.app_context():
+        user = User(username='testuser2', email='test2@example.com', password='password456')
+        db.session.add(user)
+        db.session.commit()
+
+        yield user
+
+        # Cleanup is handled by app fixture
+
+
+@pytest.fixture
 def authenticated_client(client, test_user):
     """A test client that's already logged in."""
     # Login the test user
     client.post('/auth/login', data={
         'username': 'testuser',
         'password': 'password123'
+    })
+    return client
+
+
+@pytest.fixture
+def auth_client(client, test_user):
+    """Alias for authenticated_client - a test client logged in as testuser."""
+    client.post('/auth/login', data={
+        'username': 'testuser',
+        'password': 'password123'
+    })
+    return client
+
+
+@pytest.fixture
+def auth_client2(client, test_user2):
+    """A test client logged in as testuser2 (second user)."""
+    client.post('/auth/login', data={
+        'username': 'testuser2',
+        'password': 'password456'
     })
     return client
 

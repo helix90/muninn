@@ -529,4 +529,34 @@ class AgentLink(db.Model):
         return config
 
     def __repr__(self):
-        return f'<AgentLink {self.source_agent_id} -> {self.target_agent_id}>' 
+        return f'<AgentLink {self.source_agent_id} -> {self.target_agent_id}>'
+
+
+class Credential(db.Model):
+    """User credentials stored securely with encryption
+
+    Credentials are stored encrypted with per-credential salt for enhanced security.
+    Agents can reference credentials by name using {{credential:name}} syntax.
+    """
+    __tablename__ = 'credentials'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True)
+    encrypted_value = Column(Text, nullable=False)
+    salt = Column(String(100), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_used_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = db.relationship('User', backref='credentials')
+
+    # Constraints
+    __table_args__ = (
+        Index('ix_credentials_user_name', 'user_id', 'name', unique=True),
+    )
+
+    def __repr__(self):
+        return f'<Credential {self.name} for user {self.user_id}>' 

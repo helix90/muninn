@@ -1,8 +1,45 @@
 import logging
 import os
+import re
 from flask import Flask, render_template, request
 from config import config
 from app.extensions import init_extensions
+
+
+class CredentialMaskingFilter(logging.Filter):
+    """Filter to mask credential values and references in logs"""
+    # Pattern to match {{credential:name}}
+    CREDENTIAL_PATTERN = re.compile(r'\{\{credential:([a-zA-Z0-9_-]+)\}\}')
+    # Pattern to match common credential-like values (long alphanumeric strings that might be API keys)
+    API_KEY_PATTERN = re.compile(r'(["\']?)([a-zA-Z0-9]{20,})(["\']?)')
+
+    def filter(self, record):
+        """Filter log records to mask credential references and values"""
+        if isinstance(record.msg, str):
+            # Mask {{credential:name}} references
+            record.msg = self.CREDENTIAL_PATTERN.sub(r'***CREDENTIAL:\1***', record.msg)
+
+        # Also mask in args if present
+        if record.args:
+            try:
+                if isinstance(record.args, dict):
+                    record.args = {
+                        k: self._mask_value(v) for k, v in record.args.items()
+                    }
+                elif isinstance(record.args, tuple):
+                    record.args = tuple(self._mask_value(arg) for arg in record.args)
+            except Exception:
+                # If we can't mask args, leave them as is
+                pass
+
+        return True
+
+    def _mask_value(self, value):
+        """Mask a single value if it looks like a credential"""
+        if isinstance(value, str):
+            # Mask credential references
+            value = self.CREDENTIAL_PATTERN.sub(r'***CREDENTIAL:\1***', value)
+        return value
 
 
 def create_app(config_name=None):
@@ -30,12 +67,14 @@ def create_app(config_name=None):
     from app.scheduler import scheduler_bp as scheduler_blueprint
     from app.auth import auth as auth_blueprint
     from app.events import events as events_blueprint
+    from app.credentials import credentials_bp as credentials_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(agents_blueprint)
     app.register_blueprint(scheduler_blueprint)
     app.register_blueprint(events_blueprint)
+    app.register_blueprint(credentials_blueprint)
     
     # Register CLI commands
     from app.cli import register_commands
@@ -52,33 +91,38 @@ def create_app(config_name=None):
 
 def setup_logging(app):
     """Setup application logging."""
-    
+
     # Remove default Flask logger handlers
     for handler in app.logger.handlers:
         app.logger.removeHandler(handler)
-    
+
     # Set log level
     app.logger.setLevel(app.config['LOG_LEVEL'])
-    
+
     # Create formatter
     formatter = logging.Formatter(app.config['LOG_FORMAT'])
-    
+
+    # Create credential masking filter
+    credential_filter = CredentialMaskingFilter()
+
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(app.config['LOG_LEVEL'])
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(credential_filter)
     app.logger.addHandler(console_handler)
-    
+
     # File handler for development
     if app.debug and not app.testing:
         if not os.path.exists('logs'):
             os.mkdir('logs')
-        
+
         file_handler = logging.FileHandler('logs/muninn-dev.log')
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(credential_filter)
         app.logger.addHandler(file_handler)
-    
+
     app.logger.info('Logging setup completed')
 
 

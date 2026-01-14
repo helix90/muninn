@@ -64,6 +64,7 @@ class RSSAgent(SourceAgent):
         max_entries = self.config.get('max_entries', 50)
         include_content = self.config.get('include_content', False)
         days_back = self.config.get('days_back', 7)
+        deduplication_days = self.config.get('deduplication_days', 30)
 
         self.log(f'Fetching RSS feed: {feed_url}')
 
@@ -79,10 +80,26 @@ class RSSAgent(SourceAgent):
             # Calculate cutoff date
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
 
+            # Get previously seen article IDs for deduplication
+            seen_article_ids = self._get_seen_article_ids(deduplication_days)
+            self.log(f'Found {len(seen_article_ids)} previously seen articles in last {deduplication_days} days',
+                    level='debug')
+
             events = []
             entries_processed = 0
+            entries_skipped_duplicate = 0
 
             for entry in feed.entries[:max_entries]:
+                # Extract article ID for deduplication
+                article_id = entry.get('id', entry.get('link', ''))
+
+                # Skip if already seen
+                if article_id in seen_article_ids:
+                    self.log(f'Skipping duplicate entry: {entry.get("title", "Untitled")}',
+                            level='debug')
+                    entries_skipped_duplicate += 1
+                    continue
+
                 # Extract publish date
                 published = self._extract_published_date(entry)
 
@@ -99,7 +116,7 @@ class RSSAgent(SourceAgent):
                     'summary': entry.get('summary', ''),
                     'published': published.isoformat() if published else None,
                     'author': entry.get('author', ''),
-                    'id': entry.get('id', entry.get('link', '')),
+                    'id': article_id,
                 }
 
                 # Optionally include full content
@@ -119,9 +136,10 @@ class RSSAgent(SourceAgent):
                 events.append(event)
                 entries_processed += 1
 
-            self.log(f'Fetched {entries_processed} entries from RSS feed', data={
+            self.log(f'Fetched {entries_processed} entries from RSS feed ({entries_skipped_duplicate} duplicates skipped)', data={
                 'feed_url': feed_url,
                 'entries_processed': entries_processed,
+                'entries_skipped_duplicate': entries_skipped_duplicate,
                 'feed_title': feed.feed.get('title', '')
             })
 
@@ -133,6 +151,38 @@ class RSSAgent(SourceAgent):
                 'error': str(e)
             })
             return []
+
+    def _get_seen_article_ids(self, days_back: int) -> set:
+        """
+        Get set of article IDs that have already been processed.
+
+        Args:
+            days_back: How many days back to look for existing events
+
+        Returns:
+            Set of article IDs from existing events
+        """
+        cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+
+        try:
+            # Query events created by this agent within the lookback period
+            from app.models import Event
+            existing_events = self.db_session.query(Event).filter(
+                Event.agent_id == self.agent_id,
+                Event.created_at >= cutoff_date
+            ).all()
+
+            # Extract article IDs from event payloads
+            seen_ids = set()
+            for event in existing_events:
+                if event.payload and 'id' in event.payload:
+                    seen_ids.add(event.payload['id'])
+
+            return seen_ids
+
+        except Exception as e:
+            self.log(f'Error querying seen articles: {e}', level='warning')
+            return set()  # Return empty set on error to allow processing to continue
 
     def _extract_published_date(self, entry: Dict) -> Optional[datetime]:
         """
@@ -166,7 +216,7 @@ class RSSAgent(SourceAgent):
         """Get configuration schema for RSS agent."""
         schema = super().get_config_schema()
         schema['required_fields'] = ['feed_url']
-        schema['optional_fields'] = [
+        schema['optional_fields'].extend([
             {
                 'name': 'max_entries',
                 'type': 'integer',
@@ -184,6 +234,12 @@ class RSSAgent(SourceAgent):
                 'type': 'integer',
                 'default': 7,
                 'description': 'Only fetch entries from last N days'
+            },
+            {
+                'name': 'deduplication_days',
+                'type': 'integer',
+                'default': 30,
+                'description': 'Check last N days for duplicate articles'
             }
-        ]
+        ])
         return schema

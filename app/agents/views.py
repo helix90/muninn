@@ -244,6 +244,9 @@ def edit_agent(agent_id):
                 agent.schedule_cron = None
                 agent.schedule_enabled = False
 
+            # Update is_active status
+            agent.is_active = request.form.get('is_active') == '1'
+
             db.session.commit()
 
             # Update scheduler
@@ -334,8 +337,7 @@ def agent_detail(agent_id):
         available_agents = []
         all_agents = db.session.query(Job).filter(
             Job.user_id == user_id,
-            Job.id != agent_id,  # Exclude current agent
-            Job.is_active == True
+            Job.id != agent_id  # Exclude current agent
         ).all()
 
         for potential_target in all_agents:
@@ -412,6 +414,55 @@ def run_agent(agent_id):
     except Exception as e:
         logger.error(f"Error running agent {agent_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@agents.route('/<int:agent_id>/copy', methods=['POST'])
+@login_required
+def copy_agent(agent_id):
+    """Copy an existing agent and redirect to edit page."""
+    try:
+        user_id = current_user.id
+
+        # Get original agent
+        original_agent = db.session.query(Job).filter(
+            Job.id == agent_id,
+            Job.user_id == user_id
+        ).first()
+
+        if not original_agent:
+            flash('Agent not found', 'error')
+            return redirect(url_for('agents.agent_list'))
+
+        # Create a copy with a new name
+        import json
+        copy_name = f"{original_agent.name} (Copy)"
+
+        # Deep copy the config to avoid reference issues
+        config_copy = json.loads(json.dumps(original_agent.config))
+
+        new_agent = Job(
+            name=copy_name,
+            job_type=original_agent.job_type,
+            config=config_copy,
+            user_id=user_id,
+            schedule_cron=original_agent.schedule_cron,
+            schedule_enabled=False  # Start with schedule disabled
+        )
+
+        # Set is_active after instantiation (not in __init__)
+        new_agent.is_active = False  # Start inactive to allow user to review
+
+        db.session.add(new_agent)
+        db.session.commit()
+
+        flash(f'Agent copied successfully as "{copy_name}"', 'success')
+        return redirect(url_for('agents.edit_agent', agent_id=new_agent.id))
+
+    except Exception as e:
+        logger.error(f"Error copying agent {agent_id}: {e}", exc_info=True)
+        db.session.rollback()
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('agents.agent_detail', agent_id=agent_id))
 
 
 @agents.route('/<int:agent_id>/delete', methods=['POST'])

@@ -10,7 +10,7 @@ Defines the abstract base classes and agent hierarchy:
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.agents.memory import MemoryManager
 from app.models import Event
@@ -135,6 +135,43 @@ class BaseAgent(ABC):
         # Store last 100 log entries in memory
         self.memory.append_to_list('_logs', log_entry, max_length=100)
 
+    def _cleanup_old_events(self) -> int:
+        """
+        Clean up old events based on event_retention_days config.
+
+        Deletes events older than the configured retention period.
+        Following the Huginn model, each agent specifies its own retention.
+
+        Returns:
+            Number of events deleted
+        """
+        retention_days = self.config.get('event_retention_days', 90)
+
+        if retention_days <= 0:
+            # Retention disabled (keep forever)
+            return 0
+
+        cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+
+        try:
+            # Delete old events created by this agent
+            deleted_count = self.db_session.query(Event).filter(
+                Event.agent_id == self.agent_id,
+                Event.created_at < cutoff_date
+            ).delete(synchronize_session=False)
+
+            if deleted_count > 0:
+                self.db_session.commit()
+                self.log(f'Cleaned up {deleted_count} events older than {retention_days} days',
+                        level='info', data={'retention_days': retention_days, 'deleted_count': deleted_count})
+
+            return deleted_count
+
+        except Exception as e:
+            self.log(f'Error cleaning up old events: {e}', level='error')
+            self.db_session.rollback()
+            return 0
+
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """
@@ -149,7 +186,14 @@ class BaseAgent(ABC):
         return {
             'agent_type': cls.agent_type,
             'required_fields': [],
-            'optional_fields': [],
+            'optional_fields': [
+                {
+                    'name': 'event_retention_days',
+                    'type': 'integer',
+                    'default': 90,
+                    'description': 'Number of days to keep events (0 = keep forever)'
+                }
+            ],
             'capabilities': {
                 'can_be_scheduled': cls.can_be_scheduled,
                 'can_receive_events': cls.can_receive_events,
@@ -192,6 +236,9 @@ class SourceAgent(BaseAgent):
         Returns:
             List of events created from external source
         """
+        # Clean up old events based on retention policy
+        self._cleanup_old_events()
+
         if incoming_events:
             self.log('Warning: Source agent received events (ignoring)', level='warning')
 
@@ -241,6 +288,9 @@ class TransformAgent(BaseAgent):
         Returns:
             List of transformed/filtered events
         """
+        # Clean up old events based on retention policy
+        self._cleanup_old_events()
+
         if not incoming_events:
             self.log('No incoming events to process', level='debug')
             return []
@@ -295,6 +345,9 @@ class ActionAgent(BaseAgent):
         Returns:
             Always returns empty list (action agents don't create events)
         """
+        # Clean up old events based on retention policy
+        self._cleanup_old_events()
+
         if not incoming_events:
             self.log('No incoming events to act on', level='debug')
             return []

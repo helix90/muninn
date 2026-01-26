@@ -84,7 +84,7 @@ class DevelopmentConfig(Config):
         'pool_timeout': 10,
         'pool_recycle': 1800,
         'max_overflow': 10,
-        'echo': True,  # SQL query logging
+        'echo': False,  # SQL query logging disabled
     }
 
 

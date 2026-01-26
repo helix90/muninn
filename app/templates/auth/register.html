@@ -3,35 +3,39 @@
 {% block title %}Register - Muninn{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Register for Muninn</h3>
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-center">
+        <div class="w-full max-w-md">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Register for Muninn</h3>
                 </div>
-                <div class="card-body">
+                <div class="px-6 py-6">
                     <form method="POST" action="{{ url_for('auth.register') }}">
                         {{ form.hidden_tag() }}
 
-                        <div class="mb-3">
-                            {{ form.username.label(class="form-label") }}
-                            {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        <div class="mb-6">
+                            <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Username
+                            </label>
+                            {{ form.username(class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" + (" border-red-500 dark:border-red-500" if form.username.errors else "")) }}
                             {% if form.username.errors %}
-                                <div class="invalid-feedback">
+                                <div class="mt-1 text-sm text-red-600 dark:text-red-400">
                                     {% for error in form.username.errors %}
                                         {{ error }}
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">3-80 characters</small>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">3-80 characters</p>
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.email.label(class="form-label") }}
-                            {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), type="email") }}
+                        <div class="mb-6">
+                            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Email
+                            </label>
+                            {{ form.email(class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" + (" border-red-500 dark:border-red-500" if form.email.errors else ""), type="email") }}
                             {% if form.email.errors %}
-                                <div class="invalid-feedback">
+                                <div class="mt-1 text-sm text-red-600 dark:text-red-400">
                                     {% for error in form.email.errors %}
                                         {{ error }}
                                     {% endfor %}
@@ -39,24 +43,28 @@
                             {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.password.label(class="form-label") }}
-                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+                        <div class="mb-6">
+                            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Password
+                            </label>
+                            {{ form.password(class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" + (" border-red-500 dark:border-red-500" if form.password.errors else "")) }}
                             {% if form.password.errors %}
-                                <div class="invalid-feedback">
+                                <div class="mt-1 text-sm text-red-600 dark:text-red-400">
                                     {% for error in form.password.errors %}
                                         {{ error }}
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">Minimum 8 characters</small>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Minimum 8 characters</p>
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.password_confirm.label(class="form-label") }}
-                            {{ form.password_confirm(class="form-control" + (" is-invalid" if form.password_confirm.errors else "")) }}
+                        <div class="mb-6">
+                            <label for="password_confirm" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Confirm Password
+                            </label>
+                            {{ form.password_confirm(class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" + (" border-red-500 dark:border-red-500" if form.password_confirm.errors else "")) }}
                             {% if form.password_confirm.errors %}
-                                <div class="invalid-feedback">
+                                <div class="mt-1 text-sm text-red-600 dark:text-red-400">
                                     {% for error in form.password_confirm.errors %}
                                         {{ error }}
                                     {% endfor %}
@@ -64,13 +72,18 @@
                             {% endif %}
                         </div>
 
-                        <div class="d-grid">
-                            {{ form.submit(class="btn btn-primary") }}
+                        <div class="flex justify-end">
+                            {{ form.submit(class="w-full bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400") }}
                         </div>
                     </form>
 
-                    <div class="mt-3 text-center">
-                        <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a></p>
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Already have an account?
+                            <a href="{{ url_for('auth.login') }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium">
+                                Login here
+                            </a>
+                        </p>
                     </div>
                 </div>
             </div>

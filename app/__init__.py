@@ -123,6 +123,24 @@ def setup_logging(app):
         file_handler.addFilter(credential_filter)
         app.logger.addHandler(file_handler)
 
+    # Suppress verbose SQLAlchemy logging - set to ERROR to block all SQL statements
+    logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.dialects').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.orm').setLevel(logging.ERROR)
+
+    # Also add a filter to the console handler to block SQLAlchemy messages
+    class SQLAlchemyFilter(logging.Filter):
+        def filter(self, record):
+            # Block all SQLAlchemy logs below ERROR level
+            if record.name.startswith('sqlalchemy'):
+                return record.levelno >= logging.ERROR
+            return True
+
+    sqlalchemy_filter = SQLAlchemyFilter()
+    console_handler.addFilter(sqlalchemy_filter)
+
     app.logger.info('Logging setup completed')
 
 

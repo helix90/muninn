@@ -231,8 +231,9 @@ def auth_client(client, test_user):
 
 
 @pytest.fixture
-def auth_client2(client, test_user2):
+def auth_client2(app, test_user2):
     """A test client logged in as testuser2 (second user)."""
+    client = app.test_client()
     client.post('/auth/login', data={
         'username': 'testuser2',
         'password': 'password456'

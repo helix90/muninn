@@ -126,19 +126,25 @@ class JabberAgent(ActionAgent):
         password = self.config['password']
         server = self.config.get('server')
         port = self.config.get('port', 5222)
-        use_tls = self.config.get('use_tls', True)
 
         sent_count = 0
         failed_count = 0
 
         for event in events:
             try:
+                # Prepare template context with event data
+                context = {
+                    'payload': event.payload,
+                    'metadata': event.metadata,
+                    'event': event
+                }
+
                 # Render templates
-                recipient = self._render_template(self.config['recipient'], event.payload)
-                message = self._render_template(self.config['message_template'], event.payload)
+                recipient = self._render_template(self.config['recipient'], context)
+                message = self._render_template(self.config['message_template'], context)
 
                 # Send message
-                self._send_message(jid, password, recipient, message, server, port, use_tls)
+                self._send_message(jid, password, recipient, message, server, port)
 
                 sent_count += 1
                 self.log(f'XMPP message sent successfully', level='info', data={
@@ -179,6 +185,111 @@ class JabberAgent(ActionAgent):
             self.log(f'Template rendering error: {e}', level='error')
             return f'[Render Error: {e}]'
 
+    def test_connection(self) -> Dict[str, Any]:
+        """
+        Test Jabber connection by sending a test message.
+
+        Returns:
+            Dict with success status and message
+        """
+        if not XMPP_AVAILABLE:
+            return {
+                'success': False,
+                'message': 'slixmpp library not available. Install with: pip install slixmpp'
+            }
+
+        # Clear previous logs before test
+        self.memory.set('_logs', [])
+
+        try:
+            jid = self.config['jid']
+            password = self.config['password']
+            server = self.config.get('server')
+            port = self.config.get('port', 5222)
+            use_tls = self.config.get('use_tls', True)
+
+            # Log the configuration being tested
+            self.log(f'Testing XMPP connection with configuration', level='info', data={
+                'jid': jid,
+                'server': server or 'auto-discovery from JID domain',
+                'port': port,
+                'use_tls': use_tls
+            })
+
+            # Render recipient with test data
+            test_payload = {'test': 'connection'}
+            recipient = self._render_template(self.config['recipient'], test_payload)
+
+            self.log(f'Recipient template rendered successfully: {recipient}', level='debug')
+
+            # Send test message
+            test_message = "Test message from Muninn Jabber agent. If you receive this, the connection is working!"
+            self._send_message(jid, password, recipient, test_message, server, port, use_tls)
+
+            self.log('Test message sent successfully!', level='info')
+
+            # Get logs for detailed diagnostics
+            logs = self.memory.get('_logs', [])
+
+            return {
+                'success': True,
+                'message': f'Test message sent successfully to {recipient}',
+                'details': {
+                    'jid': jid,
+                    'recipient': recipient,
+                    'server': server or 'DNS SRV lookup',
+                    'port': port,
+                    'logs': logs[-10:]  # Last 10 log entries
+                }
+            }
+
+        except Exception as e:
+            import traceback
+            import sys
+
+            # Get detailed error information
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+
+            # Get logs for detailed diagnostics
+            logs = self.memory.get('_logs', [])
+
+            # Build detailed error message
+            error_details = {
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'configuration': {
+                    'jid': self.config.get('jid'),
+                    'server': self.config.get('server') or 'auto-discovery from JID domain',
+                    'port': self.config.get('port', 5222),
+                    'use_tls': self.config.get('use_tls', True),
+                    'recipient_template': self.config.get('recipient')
+                },
+                'logs': logs[-20:],  # Last 20 log entries for more context
+                'traceback': ''.join(tb_lines[-5:])  # Last 5 lines of traceback
+            }
+
+            # Create user-friendly error message
+            error_msg = f"Connection test failed: {str(e)}\n\n"
+            error_msg += f"Configuration:\n"
+            error_msg += f"  JID: {self.config.get('jid')}\n"
+            error_msg += f"  Server: {self.config.get('server') or 'auto-discovery from JID domain'}\n"
+            error_msg += f"  Port: {self.config.get('port', 5222)}\n"
+            error_msg += f"  Use TLS: {self.config.get('use_tls', True)}\n\n"
+
+            if logs:
+                error_msg += f"Recent logs:\n"
+                for log_entry in logs[-5:]:
+                    error_msg += f"  [{log_entry.get('level', 'info').upper()}] {log_entry.get('message', '')}\n"
+
+            self.log(f'Test connection failed: {str(e)}', level='error', data=error_details)
+
+            return {
+                'success': False,
+                'message': error_msg,
+                'details': error_details
+            }
+
     def _send_message(self, jid: str, password: str, recipient: str,
                      message: str, server: str = None, port: int = 5222,
                      use_tls: bool = True) -> None:
@@ -194,6 +305,29 @@ class JabberAgent(ActionAgent):
             port: Server port
             use_tls: Use TLS encryption
         """
+        import asyncio
+        import logging
+
+        # Enable detailed XMPP logging for diagnosis
+        logging.getLogger('slixmpp').setLevel(logging.DEBUG)
+
+        # Create a new event loop for this thread FIRST (Flask uses threads)
+        # This must happen before any slixmpp operations
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        # Log connection attempt details
+        self.log(f'Attempting XMPP connection', level='debug', data={
+            'jid': jid,
+            'server': server or 'auto-discovery from JID',
+            'port': port,
+            'recipient': recipient,
+            'use_tls': use_tls
+        })
+
+        # Track error for better diagnostics
+        connection_error = None
+
         # Create a simple XMPP client
         class SendMsgBot(slixmpp.ClientXMPP):
             def __init__(self, jid, password, recipient, message):
@@ -201,41 +335,205 @@ class JabberAgent(ActionAgent):
                 self.recipient = recipient
                 self.msg = message
                 self.message_sent = False
+                self.connection_error = None
+
+                # Register XEP plugins for better compatibility
+                self.register_plugin('xep_0030')  # Service Discovery
+                self.register_plugin('xep_0199')  # XMPP Ping
+
+                # Enable specific SASL mechanisms for broader server compatibility
+                # Some servers only support PLAIN, others prefer SCRAM-SHA-1
+                self.register_plugin('feature_mechanisms')
+
+                # Try to enable common SASL mechanisms
+                try:
+                    # Add PLAIN mechanism explicitly (most compatible but less secure over non-TLS)
+                    from slixmpp.features.feature_mechanisms import stanza
+                    if 'PLAIN' not in self.boundjid.bare:
+                        pass  # PLAIN is usually enabled by default
+                except:
+                    pass  # Ignore if we can't manipulate mechanisms
 
                 # Register event handlers
                 self.add_event_handler("session_start", self.start)
                 self.add_event_handler("message", self.message)
+                self.add_event_handler("failed_auth", self.failed_auth)
+                self.add_event_handler("no_auth", self.no_auth)
+                self.add_event_handler("disconnected", self.on_disconnect)
+
+                # Add handler to see what mechanisms are offered by server
+                self.add_event_handler("stream_negotiated", self.stream_negotiated)
 
             async def start(self, event):
                 """Send message on session start"""
-                self.send_presence()
-                await self.get_roster()
+                try:
+                    self.send_presence()
+                    await self.get_roster()
 
-                # Send message
-                self.send_message(mto=self.recipient, mbody=self.msg, mtype='chat')
-                self.message_sent = True
+                    # Send message
+                    self.send_message(mto=self.recipient, mbody=self.msg, mtype='chat')
+                    self.message_sent = True
 
-                # Disconnect after sending
-                self.disconnect()
+                    # Disconnect after sending
+                    self.disconnect()
+                except Exception as e:
+                    self.connection_error = f"Error in session start: {e}"
+                    self.disconnect()
 
             def message(self, msg):
                 """Handle incoming messages (not used for sending)"""
                 pass
 
-        # Create bot instance
-        xmpp = SendMsgBot(jid, password, recipient, message)
+            def failed_auth(self, event):
+                """Handle authentication failure"""
+                import logging
+                error_msg = "Authentication failed - check username and password"
+                self.connection_error = error_msg
+                logging.error(f"XMPP failed_auth event: {error_msg}")
+                logging.error(f"JID used: {self.boundjid}")
+                self.disconnect()
 
-        # Configure connection
-        if server:
-            xmpp.connect((server, port), use_ssl=False, use_tls=use_tls)
-        else:
-            xmpp.connect(None, use_ssl=False, use_tls=use_tls)
+            def no_auth(self, event):
+                """Handle no authentication method available"""
+                import logging
+                error_msg = "No appropriate login method - server may require specific SASL mechanism"
+                self.connection_error = error_msg
+                logging.error(f"XMPP no_auth event: {error_msg}")
+                self.disconnect()
 
-        # Process XMPP stanzas
-        xmpp.process(forever=False)
+            def on_disconnect(self, event):
+                """Handle disconnection"""
+                import logging
+                logging.debug(f"XMPP disconnected. Message sent: {self.message_sent}")
+                if not self.message_sent and not self.connection_error:
+                    self.connection_error = "Disconnected before message could be sent"
 
-        if not xmpp.message_sent:
-            raise Exception("Failed to send XMPP message")
+            def stream_negotiated(self, event):
+                """Log what SASL mechanisms are available"""
+                import logging
+                try:
+                    # Try to log available SASL mechanisms
+                    if hasattr(self, 'features') and self.features:
+                        mechanisms = self.features.get('mechanisms', None)
+                        if mechanisms:
+                            logging.debug(f"SASL mechanisms available: {mechanisms}")
+                except Exception as e:
+                    logging.debug(f"Could not retrieve SASL mechanisms: {e}")
+
+        try:
+            # Create bot instance
+            xmpp = SendMsgBot(jid, password, recipient, message)
+
+            # Enable slixmpp debug logging temporarily for diagnostics
+            import logging as py_logging
+            slixmpp_logger = py_logging.getLogger('slixmpp')
+            slixmpp_logger.setLevel(py_logging.DEBUG)
+
+            # Configure SSL context for self-signed certificates
+            # Many self-hosted servers like Freedombox use self-signed certs
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            xmpp.ssl_context = ssl_context
+
+            # Disable IPv6 if causing issues
+            xmpp.use_ipv6 = False
+
+            # Configure connection
+            # For most servers, let slixmpp figure out the connection details via DNS SRV
+            # This is especially important for proper XMPP servers
+            self.log(f'Initiating XMPP connection...', level='info', data={
+                'explicit_server': bool(server),
+                'server': server,
+                'port': port,
+                'jid': jid
+            })
+
+            # Test basic socket connectivity first
+            if server:
+                import socket
+                try:
+                    self.log(f'Testing TCP socket connectivity to {server}:{port}...', level='debug')
+                    test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    test_sock.settimeout(5)
+                    test_sock.connect((server, port))
+                    test_sock.close()
+                    self.log(f'TCP socket connection successful', level='debug')
+                except Exception as sock_err:
+                    self.log(f'TCP socket test failed: {sock_err}', level='error')
+                    raise Exception(f"Cannot establish TCP connection to {server}:{port}: {sock_err}")
+
+            # Initiate XMPP connection
+            # Note: connect() just initiates the connection; the actual connection
+            # and authentication happens when we call process() below via the event loop
+            if server:
+                # For servers with explicit host:port, use STARTTLS (standard for port 5222)
+                self.log(f'Initiating XMPP connection to {server}:{port}...', level='info')
+                try:
+                    xmpp.connect((server, port), use_ssl=False, force_starttls=True)
+                    self.log(f'Connection initiated, starting event loop...', level='debug')
+                except Exception as e:
+                    self.log(f'Connection initiation failed: {e}', level='error')
+                    raise Exception(f"Failed to initiate XMPP connection: {e}")
+            else:
+                # Use DNS SRV lookup when no explicit server is provided
+                self.log(f'Initiating XMPP connection via DNS SRV lookup...', level='info')
+                try:
+                    xmpp.connect(use_ssl=False, force_starttls=True)
+                    self.log(f'Connection initiated via DNS SRV, starting event loop...', level='debug')
+                except Exception as e:
+                    self.log(f'Connection initiation failed: {e}', level='error')
+                    raise Exception(f"Failed to initiate XMPP connection via DNS SRV: {e}")
+
+            # Process XMPP stanzas with a timeout
+            # Use process(timeout=15) to allow up to 15 seconds for connection and send
+            self.log('Processing XMPP stanzas (timeout=15s)...', level='debug')
+            xmpp.process(timeout=15)
+
+            # Log final status
+            self.log(f'XMPP processing complete', level='debug', data={
+                'message_sent': xmpp.message_sent,
+                'connection_error': xmpp.connection_error
+            })
+
+            # Check for errors
+            if xmpp.connection_error:
+                self.log(f'XMPP connection error detected: {xmpp.connection_error}', level='error')
+                raise Exception(xmpp.connection_error)
+
+            if not xmpp.message_sent:
+                error_msg = "Failed to send XMPP message - connection may have timed out or credentials are incorrect"
+                self.log(error_msg, level='error')
+                raise Exception(error_msg)
+
+            self.log('XMPP message sent successfully', level='info')
+        finally:
+            # Clean up event loop properly to avoid "Task was destroyed but it is pending!" warnings
+            try:
+                # First, try to disconnect the XMPP client cleanly
+                try:
+                    xmpp.disconnect()
+                except Exception:
+                    pass
+
+                # Cancel all pending tasks
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+
+                # Run the loop one final time to process cancellations
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
+                # Stop the loop if it's running
+                if loop.is_running():
+                    loop.stop()
+
+                # Close the loop
+                loop.close()
+            except Exception:
+                pass  # Ignore cleanup errors
 
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:

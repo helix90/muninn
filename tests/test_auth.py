@@ -232,6 +232,231 @@ class TestAuthenticationForms:
             assert form.validate() is False
 
 
+class TestUserSettings:
+    """Test user settings functionality."""
+
+    def test_settings_route_requires_authentication(self, client):
+        """Test that settings route requires authentication."""
+        response = client.get('/auth/settings', follow_redirects=False)
+        # Should redirect to login page
+        assert response.status_code in [302, 401]
+
+    def test_settings_page_get_request(self, client, app):
+        """Test that authenticated user can access settings page."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='settingsuser',
+                email='settings@example.com',
+                password='password123'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'settingsuser',
+            'password': 'password123'
+        })
+
+        # Access settings page
+        response = client.get('/auth/settings')
+        assert response.status_code == 200
+        assert b'User Settings' in response.data or b'Account Information' in response.data
+
+    def test_successful_password_change(self, client, app):
+        """Test successful password change with valid data."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='changepass',
+                email='changepass@example.com',
+                password='oldpassword123'
+            )
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'changepass',
+            'password': 'oldpassword123'
+        })
+
+        # Change password
+        response = client.post('/auth/settings', data={
+            'current_password': 'oldpassword123',
+            'new_password': 'newpassword456',
+            'confirm_password': 'newpassword456'
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b'Password changed successfully' in response.data
+
+        # Verify password was actually changed in database
+        with app.app_context():
+            user = db.session.query(User).get(user_id)
+            assert user.check_password('newpassword456') is True
+            assert user.check_password('oldpassword123') is False
+
+    def test_incorrect_current_password_rejected(self, client, app):
+        """Test that incorrect current password is rejected."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='wrongpass',
+                email='wrongpass@example.com',
+                password='correctpassword'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'wrongpass',
+            'password': 'correctpassword'
+        })
+
+        # Try to change password with wrong current password
+        response = client.post('/auth/settings', data={
+            'current_password': 'wrongoldpassword',
+            'new_password': 'newpassword456',
+            'confirm_password': 'newpassword456'
+        })
+
+        assert response.status_code == 200
+        assert b'Current password is incorrect' in response.data
+
+    def test_new_password_too_short_rejected(self, client, app):
+        """Test that new password shorter than minimum length is rejected."""
+        from app.constants import MIN_PASSWORD_LENGTH
+
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='shortpass',
+                email='shortpass@example.com',
+                password='validpassword123'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'shortpass',
+            'password': 'validpassword123'
+        })
+
+        # Try to change password with too short new password
+        response = client.post('/auth/settings', data={
+            'current_password': 'validpassword123',
+            'new_password': 'short',
+            'confirm_password': 'short'
+        })
+
+        assert response.status_code == 200
+        # Should show validation error about password length
+
+    def test_password_confirmation_mismatch_rejected(self, client, app):
+        """Test that mismatched password confirmation is rejected."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='mismatchuser',
+                email='mismatch@example.com',
+                password='currentpassword123'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'mismatchuser',
+            'password': 'currentpassword123'
+        })
+
+        # Try to change password with mismatched confirmation
+        response = client.post('/auth/settings', data={
+            'current_password': 'currentpassword123',
+            'new_password': 'newpassword456',
+            'confirm_password': 'differentpassword789'
+        })
+
+        assert response.status_code == 200
+        # Should show validation error about passwords not matching
+
+    def test_can_login_with_new_password(self, client, app):
+        """Test that user can login with new password after change."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='logintest',
+                email='logintest@example.com',
+                password='oldpass123'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'logintest',
+            'password': 'oldpass123'
+        })
+
+        # Change password
+        client.post('/auth/settings', data={
+            'current_password': 'oldpass123',
+            'new_password': 'newpass456',
+            'confirm_password': 'newpass456'
+        })
+
+        # Log out
+        client.get('/auth/logout')
+
+        # Log in with new password
+        response = client.post('/auth/login', data={
+            'username': 'logintest',
+            'password': 'newpass456'
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+
+        # Try to log in with old password (should fail)
+        client.get('/auth/logout')
+        response = client.post('/auth/login', data={
+            'username': 'logintest',
+            'password': 'oldpass123'
+        })
+
+        assert response.status_code == 200
+        assert b'Invalid username or password' in response.data
+
+    def test_settings_shows_user_information(self, client, app):
+        """Test that settings page displays user account information."""
+        # Create and log in a user
+        with app.app_context():
+            user = User(
+                username='infouser',
+                email='info@example.com',
+                password='password123'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Log in
+        client.post('/auth/login', data={
+            'username': 'infouser',
+            'password': 'password123'
+        })
+
+        # Access settings page
+        response = client.get('/auth/settings')
+
+        assert response.status_code == 200
+        assert b'infouser' in response.data
+        assert b'info@example.com' in response.data
+
+
 class TestFlaskLoginIntegration:
     """Test Flask-Login integration."""
 

@@ -223,12 +223,12 @@ function generateFieldHTML(field) {
     }
 
     let html = `<div>
-        <label for="${fieldId}" class="block text-sm font-medium text-gray-700 mb-1">
+        <label for="${fieldId}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             ${field.label} ${requiredStar}
         </label>`;
 
     if (field.description) {
-        html += `<p class="text-xs text-gray-500 mb-2">${field.description}</p>`;
+        html += `<p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${field.description}</p>`;
     }
 
     switch (field.type) {
@@ -236,25 +236,25 @@ function generateFieldHTML(field) {
         case 'url':
         case 'email':
             html += `<input type="${field.type}" id="${fieldId}" name="${fieldId}" ${required}
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                            placeholder="${field.placeholder || ''}">`;
             break;
 
         case 'number':
             html += `<input type="number" id="${fieldId}" name="${fieldId}" ${required}
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                            placeholder="${field.placeholder || ''}">`;
             break;
 
         case 'textarea':
             html += `<textarea id="${fieldId}" name="${fieldId}" ${required} rows="4"
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                               placeholder="${field.placeholder || ''}"></textarea>`;
             break;
 
         case 'select':
             html += `<select id="${fieldId}" name="${fieldId}" ${required}
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">
                         <option value="">Select ${field.label}</option>`;
             if (field.options) {
                 field.options.forEach(opt => {
@@ -267,14 +267,14 @@ function generateFieldHTML(field) {
         case 'checkbox':
             html += `<div class="flex items-center">
                         <input type="checkbox" id="${fieldId}" name="${fieldId}" value="true"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="${fieldId}" class="ml-2 text-sm text-gray-700">${field.description || field.label}</label>
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded">
+                        <label for="${fieldId}" class="ml-2 text-sm text-gray-700 dark:text-gray-300">${field.description || field.label}</label>
                      </div>`;
             break;
 
         default:
             html += `<input type="text" id="${fieldId}" name="${fieldId}" ${required}
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">`;
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">`;
     }
 
     html += `</div>`;
@@ -293,10 +293,10 @@ function generateFilterRuleBuilder(fieldId, required, requiredStar) {
     const exampleRules = schema.example_rules || [];
 
     let html = `<div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Filter Rules ${requiredStar}
         </label>
-        <p class="text-xs text-gray-500 mb-3">Build filter rules to keep only events that match your criteria</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Build filter rules to keep only events that match your criteria</p>
 
         <!-- Rules Container -->
         <div id="filter-rules-container" class="space-y-3 mb-3"></div>
@@ -304,12 +304,12 @@ function generateFilterRuleBuilder(fieldId, required, requiredStar) {
         <!-- Actions -->
         <div class="flex gap-2 mb-3">
             <button type="button" onclick="addFilterRule()"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">
+                    class="px-3 py-1 bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm rounded">
                 + Add Rule
             </button>
 
             <select onchange="loadExampleRules(this.value); this.value='';"
-                    class="px-3 py-1 border border-gray-300 rounded text-sm">
+                    class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                 <option value="">Load Example...</option>`;
 
     exampleRules.forEach((example, idx) => {
@@ -320,9 +320,9 @@ function generateFilterRuleBuilder(fieldId, required, requiredStar) {
         </div>
 
         <!-- JSON Preview (Collapsible) -->
-        <details class="border border-gray-300 rounded p-2">
-            <summary class="cursor-pointer text-sm font-medium text-gray-700">JSON Preview</summary>
-            <pre id="filter-rules-json-preview" class="mt-2 text-xs bg-gray-50 p-2 rounded overflow-x-auto">[]</pre>
+        <details class="border border-gray-300 dark:border-gray-600 rounded p-2">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">JSON Preview</summary>
+            <pre id="filter-rules-json-preview" class="mt-2 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto">[]</pre>
         </details>
 
         <!-- Hidden input for form submission -->
@@ -388,7 +388,7 @@ function renderFilterRules() {
     if (!container) return;
 
     if (filterRules.length === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-500 italic">No rules yet. Click "Add Rule" to get started.</p>';
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic">No rules yet. Click "Add Rule" to get started.</p>';
         return;
     }
 
@@ -400,11 +400,11 @@ function renderRuleCard(rule) {
     const filterTypes = window.filterTypesData || [];
     const showValue = needsValue(rule.type);
 
-    let html = `<div class="border border-gray-300 rounded p-3 bg-white">
+    let html = `<div class="border border-gray-300 dark:border-gray-600 rounded p-3 bg-white dark:bg-gray-800">
         <div class="flex justify-between items-start mb-2">
-            <span class="text-sm font-medium text-gray-700">Rule #${rule.id + 1}</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Rule #${rule.id + 1}</span>
             <button type="button" onclick="removeFilterRule(${rule.id})"
-                    class="text-red-600 hover:text-red-800 text-sm">
+                    class="text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 text-sm">
                 Remove
             </button>
         </div>
@@ -412,18 +412,18 @@ function renderRuleCard(rule) {
         <div class="grid grid-cols-1 gap-2">
             <!-- Field Path -->
             <div>
-                <label class="block text-xs text-gray-600 mb-1">Field Path</label>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Field Path</label>
                 <input type="text" value="${rule.field}"
                        onchange="updateRuleField(${rule.id}, 'field', this.value)"
                        placeholder="e.g., title, author.name"
-                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded">
+                       class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
             </div>
 
             <!-- Filter Type -->
             <div>
-                <label class="block text-xs text-gray-600 mb-1">Filter Type</label>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Filter Type</label>
                 <select onchange="updateRuleField(${rule.id}, 'type', this.value)"
-                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded">`;
+                        class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">`;
 
     filterTypes.forEach(ft => {
         const selected = ft.value === rule.type ? 'selected' : '';
@@ -431,18 +431,18 @@ function renderRuleCard(rule) {
     });
 
     html += `</select>
-                <p class="text-xs text-gray-500 mt-1">${filterTypes.find(ft => ft.value === rule.type)?.description || ''}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${filterTypes.find(ft => ft.value === rule.type)?.description || ''}</p>
             </div>
 
             <!-- Value (conditional) -->`;
 
     if (showValue) {
         html += `<div>
-                <label class="block text-xs text-gray-600 mb-1">Value</label>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Value</label>
                 <input type="text" value="${rule.value}"
                        onchange="updateRuleField(${rule.id}, 'value', this.value)"
                        placeholder="Enter value to compare"
-                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded">
+                       class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
             </div>`;
     }
 
@@ -452,8 +452,8 @@ function renderRuleCard(rule) {
         html += `<div class="flex items-center">
                 <input type="checkbox" ${rule.case_sensitive ? 'checked' : ''}
                        onchange="updateRuleField(${rule.id}, 'case_sensitive', this.checked)"
-                       class="h-4 w-4 text-blue-600 border-gray-300 rounded mr-2">
-                <label class="text-xs text-gray-700">Case sensitive</label>
+                       class="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded mr-2">
+                <label class="text-xs text-gray-700 dark:text-gray-300">Case sensitive</label>
             </div>`;
     }
 

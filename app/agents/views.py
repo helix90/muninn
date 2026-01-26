@@ -496,6 +496,92 @@ def delete_agent(agent_id):
         return redirect(url_for('agents.agent_detail', agent_id=agent_id))
 
 
+@agents.route('/<int:agent_id>/test', methods=['POST'])
+@login_required
+def test_agent_connection(agent_id):
+    """Test agent connection (currently only for Jabber agents)."""
+    try:
+        user_id = current_user.id
+
+        # Get agent
+        agent_model = db.session.query(Job).filter(
+            Job.id == agent_id,
+            Job.user_id == user_id
+        ).first()
+
+        if not agent_model:
+            flash('Agent not found', 'error')
+            return redirect(url_for('agents.agent_list'))
+
+        # Only Jabber agents support connection testing for now
+        if agent_model.job_type != 'jabber_agent':
+            flash('Connection testing is only available for Jabber agents', 'error')
+            return redirect(url_for('agents.agent_detail', agent_id=agent_id))
+
+        # Create agent instance
+        from app.agents.registry import agent_registry
+        agent = agent_registry.create_agent(
+            agent_type=agent_model.job_type,
+            agent_id=agent_model.id,
+            config=agent_model.config,
+            user_id=agent_model.user_id,
+            db_session=db.session
+        )
+
+        # Call test_connection method
+        if hasattr(agent, 'test_connection'):
+            result = agent.test_connection()
+
+            # Log detailed diagnostic information to Flask logger
+            if 'details' in result:
+                logger.info(f"Test connection result for agent {agent_id}:")
+                logger.info(f"Success: {result['success']}")
+
+                details = result['details']
+                if 'configuration' in details:
+                    logger.info(f"Configuration: {details['configuration']}")
+
+                if 'logs' in details:
+                    logger.info(f"Agent logs ({len(details['logs'])} entries):")
+                    for log_entry in details['logs']:
+                        log_level = log_entry.get('level', 'info').upper()
+                        log_msg = log_entry.get('message', '')
+                        log_data = log_entry.get('data', {})
+                        logger.info(f"  [{log_level}] {log_msg}")
+                        if log_data:
+                            logger.info(f"      Data: {log_data}")
+
+                if 'error_message' in details:
+                    logger.error(f"Error message: {details['error_message']}")
+
+                if 'traceback' in details:
+                    logger.error(f"Traceback: {details['traceback']}")
+
+            if result['success']:
+                flash(result['message'], 'success')
+            else:
+                # Include more details in error message
+                error_msg = result['message']
+                if 'details' in result and 'logs' in result['details']:
+                    logs = result['details']['logs']
+                    if logs:
+                        error_msg += "\n\nRecent logs:"
+                        for log_entry in logs[-15:]:  # Show last 15 logs for better diagnostics
+                            log_level = log_entry.get('level', 'info').upper()
+                            log_msg = log_entry.get('message', '')
+                            error_msg += f"\n[{log_level}] {log_msg}"
+                flash(error_msg, 'error')
+        else:
+            flash('This agent type does not support connection testing', 'error')
+
+        return redirect(url_for('agents.agent_detail', agent_id=agent_id))
+
+    except Exception as e:
+        logger.error(f"Error testing agent connection {agent_id}: {e}", exc_info=True)
+        flash(f'An error occurred during connection test: {str(e)}', 'error')
+        return redirect(url_for('agents.agent_detail', agent_id=agent_id))
+
+
 @agents.route('/link', methods=['POST'])
 @login_required
 def create_link():

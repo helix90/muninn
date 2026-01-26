@@ -6,7 +6,7 @@ import logging
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from app.auth import auth
-from app.auth.forms import LoginForm, RegistrationForm
+from app.auth.forms import LoginForm, RegistrationForm, ChangePasswordForm
 from app.extensions import db
 from app.models import User
 
@@ -84,6 +84,35 @@ def logout():
     logger.info(f'User {username} logged out')
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('auth.login'))
+
+
+@auth.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    """User settings page."""
+    form = ChangePasswordForm()
+
+    if form.validate_on_submit():
+        # Verify current password
+        if not current_user.check_password(form.current_password.data):
+            flash('Current password is incorrect', 'error')
+            return render_template('auth/settings.html', form=form)
+
+        try:
+            # Update password
+            current_user.set_password(form.new_password.data)
+            db.session.commit()
+
+            logger.info(f'User {current_user.username} changed their password')
+            flash('Password changed successfully', 'success')
+            return redirect(url_for('auth.settings'))
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Error changing password for user {current_user.username}: {e}')
+            flash('An error occurred while changing your password. Please try again.', 'error')
+
+    return render_template('auth/settings.html', form=form)
 
 
 @auth.route('/api/user/theme', methods=['POST'])

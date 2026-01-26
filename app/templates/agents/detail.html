@@ -39,6 +39,13 @@
                         Copy
                     </button>
                 </form>
+                {% if agent.job_type == 'jabber_agent' %}
+                <form method="POST" action="{{ url_for('agents.test_agent_connection', agent_id=agent.id) }}" class="inline">
+                    <button type="submit" class="bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        Test Connection
+                    </button>
+                </form>
+                {% endif %}
                 <a href="{{ url_for('agents.agent_list') }}" class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-bold py-2 px-4 rounded">
                     Back to List
                 </a>

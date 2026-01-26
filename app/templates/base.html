@@ -125,12 +125,33 @@
                         </svg>
                     </button>
 
-                    <!-- User menu placeholder -->
-                    <div class="ml-3 relative">
-                        <div class="text-sm text-gray-500 dark:text-gray-400">
-                            Welcome to Muninn
-                        </div>
+                    <!-- User menu -->
+                    {% if current_user.is_authenticated %}
+                    <div class="ml-3 flex items-center space-x-4">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">
+                            {{ current_user.username }}
+                        </span>
+                        <a href="{{ url_for('auth.settings') }}"
+                           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
+                            Settings
+                        </a>
+                        <a href="{{ url_for('auth.logout') }}"
+                           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
+                            Logout
+                        </a>
                     </div>
+                    {% else %}
+                    <div class="ml-3 flex items-center space-x-4">
+                        <a href="{{ url_for('auth.login') }}"
+                           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
+                            Login
+                        </a>
+                        <a href="{{ url_for('auth.register') }}"
+                           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
+                            Register
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

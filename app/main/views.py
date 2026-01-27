@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from flask import Blueprint, render_template, jsonify, current_app
 from app.main import main
 from app.extensions import db
@@ -33,7 +34,7 @@ def health_check():
         'version': '1.0.0',
         'environment': current_app.config.get('ENV', 'development'),
         'database': db_status,
-        'timestamp': db.func.now().compile().string if hasattr(db, 'func') else None
+        'timestamp': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     }
     
     # Set appropriate HTTP status code

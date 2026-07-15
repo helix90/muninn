@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -68,6 +69,8 @@ def create_app(config_name=None):
     from app.auth import auth as auth_blueprint
     from app.events import events as events_blueprint
     from app.credentials import credentials_bp as credentials_blueprint
+    from app.scenarios import scenarios_bp as scenarios_blueprint
+    from app.webhooks import webhook_bp as webhooks_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
@@ -75,6 +78,8 @@ def create_app(config_name=None):
     app.register_blueprint(scheduler_blueprint)
     app.register_blueprint(events_blueprint)
     app.register_blueprint(credentials_blueprint)
+    app.register_blueprint(scenarios_blueprint)
+    app.register_blueprint(webhooks_blueprint)
     
     # Register CLI commands
     from app.cli import register_commands
@@ -82,10 +87,16 @@ def create_app(config_name=None):
     
     # Register error handlers
     register_error_handlers(app)
-    
+
+    # Register context processors
+    register_context_processors(app)
+
+    # Register custom Jinja filters
+    register_template_filters(app)
+
     # Log application startup
     app.logger.info(f'Muninn application started with {config_name} configuration')
-    
+
     return app
 
 
@@ -187,4 +198,33 @@ def register_error_handlers(app):
         try:
             db.session.remove()
         except:
-            pass 
+            pass
+
+
+def register_template_filters(app):
+    """Register custom Jinja2 filters."""
+
+    @app.template_filter('format_json')
+    def format_json(value, indent=2):
+        """Pretty-print a value as JSON for display in a <pre> block.
+
+        Flask's built-in |tojson filter escapes characters such as ' < > & into
+        \\u0027 \\u003c \\u003e \\u0026 for safe embedding inside <script> tags. That
+        escaping is unnecessary and unreadable when displaying JSON in a <pre> block.
+        This filter uses plain json.dumps with ensure_ascii=False (so apostrophes,
+        curly quotes, em dashes, etc. appear as real characters), then applies normal
+        HTML escaping so the result is safe to embed directly in HTML.
+        """
+        from markupsafe import Markup, escape
+        raw = json.dumps(value, indent=indent, ensure_ascii=False, default=str)
+        return Markup(escape(raw))
+
+
+def register_context_processors(app):
+    """Register context processors to inject variables into all templates."""
+    from datetime import datetime
+
+    @app.context_processor
+    def inject_current_year():
+        """Inject current year into all templates for copyright."""
+        return {'current_year': datetime.now().year} 

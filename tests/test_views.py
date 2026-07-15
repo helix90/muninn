@@ -186,4 +186,24 @@ class TestPerformance:
         load_time = time.time() - start_time
         
         assert response.status_code == 200
-        assert load_time < 0.1  # Should be very fast 
+        assert load_time < 0.1  # Should be very fast
+
+
+class TestCopyright:
+    """Test copyright year is current."""
+
+    def test_copyright_year_is_current(self, client):
+        """Test that the copyright year in the footer is always the current year."""
+        from datetime import datetime
+
+        response = client.get('/')
+        assert response.status_code == 200
+
+        # Get current year
+        current_year = datetime.now().year
+
+        # Check that the copyright notice contains the current year
+        content = response.data.decode('utf-8')
+        copyright_text = f'&copy; {current_year} Muninn'
+
+        assert copyright_text in content, f"Copyright year should be {current_year}, but was not found in page content" 

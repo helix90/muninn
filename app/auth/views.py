@@ -6,7 +6,10 @@ import logging
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from app.auth import auth
-from app.auth.forms import LoginForm, RegistrationForm, ChangePasswordForm
+from app.auth.forms import (
+    LoginForm, RegistrationForm, ChangePasswordForm,
+    ForgotUsernameForm, ForgotPasswordForm, ResetPasswordForm
+)
 from app.extensions import db
 from app.models import User
 
@@ -73,6 +76,75 @@ def register():
             flash('An error occurred during registration. Please try again.', 'error')
 
     return render_template('auth/register.html', form=form)
+
+
+@auth.route('/forgot-username', methods=['GET', 'POST'])
+def forgot_username():
+    """Look up a username by email address."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    form = ForgotUsernameForm()
+    found_username = None
+    if form.validate_on_submit():
+        user = db.session.query(User).filter_by(email=form.email.data.lower()).first()
+        if user:
+            found_username = user.username
+        else:
+            # Always show the same UI — don't reveal whether email exists
+            found_username = None
+            flash('If that email is registered, the username will appear below.', 'info')
+
+    return render_template('auth/forgot_username.html', form=form, found_username=found_username)
+
+
+@auth.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Generate a password reset link for the given email."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    form = ForgotPasswordForm()
+    reset_url = None
+    if form.validate_on_submit():
+        user = db.session.query(User).filter_by(email=form.email.data.lower()).first()
+        if user:
+            token = user.generate_reset_token()
+            db.session.commit()
+            reset_url = url_for('auth.reset_password', token=token, _external=True)
+            logger.info(f'Password reset token generated for user {user.username}')
+        else:
+            flash('If that email is registered, a reset link will appear below.', 'info')
+
+    return render_template('auth/forgot_password.html', form=form, reset_url=reset_url)
+
+
+@auth.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Reset password using a valid token."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('This password reset link is invalid or has expired.', 'error')
+        return redirect(url_for('auth.forgot_password'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        try:
+            user.set_password(form.new_password.data)
+            user.clear_reset_token()
+            db.session.commit()
+            logger.info(f'User {user.username} reset their password')
+            flash('Your password has been reset. You can now log in.', 'success')
+            return redirect(url_for('auth.login'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Error resetting password: {e}')
+            flash('An error occurred. Please try again.', 'error')
+
+    return render_template('auth/reset_password.html', form=form, token=token)
 
 
 @auth.route('/logout')

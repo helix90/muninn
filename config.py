@@ -63,6 +63,9 @@ class Config:
     SCHEDULER_JITTER_MAX_SECONDS = get_env_int('SCHEDULER_JITTER_MAX', 60)
     SCHEDULER_MAX_STARTS_PER_SECOND = get_env_int('SCHEDULER_MAX_STARTS_PER_SEC', 5)
 
+    # Agent failure reporting window
+    AGENT_FAILURE_WINDOW_DAYS = get_env_int('AGENT_FAILURE_WINDOW_DAYS', 7)
+
     @staticmethod
     def init_app(app):
         """Initialize application with configuration."""
@@ -109,6 +112,14 @@ class TestingConfig(Config):
         'max_overflow': 10,       # Allow more overflow connections
         'pool_pre_ping': True,    # Test connections before using
     }
+
+    # SMTP defaults for testing (override with env vars if needed)
+    SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.test.example.com')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_USE_TLS = True
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME', 'test@test.example.com')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'test_password')
+    SMTP_FROM_EMAIL = os.getenv('SMTP_FROM_EMAIL', 'noreply@test.example.com')
 
 
 class ProductionConfig(Config):

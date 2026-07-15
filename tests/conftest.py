@@ -2,91 +2,107 @@
 Pytest configuration and fixtures for Muninn testing
 """
 
-import os
-import tempfile
 import pytest
 from sqlalchemy import text
+from flask import g
 from app import create_app
 from app.extensions import db
 
 
-def drop_all_with_enums(db_instance):
-    """Drop all tables and PostgreSQL ENUMs properly."""
+def _drop_all_with_enums():
+    """Drop all tables, types, and other objects in the public schema."""
     try:
-        # First, close all sessions and expire all objects
-        db_instance.session.remove()
-        db_instance.session.expire_all()
+        db.session.remove()
+        db.engine.dispose()
 
-        # Then, drop all custom ENUM types (PostgreSQL specific)
-        # Do this BEFORE dropping tables to avoid constraint issues
-        try:
-            # Use raw connection without transaction context for DDL
-            with db_instance.engine.connect() as connection:
-                # Commit any pending transactions first
-                try:
-                    connection.commit()
-                except:
-                    pass
+        with db.engine.connect() as conn:
+            conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+            # Terminate all other connections that might hold locks
+            conn.execute(text("""
+                SELECT pg_terminate_backend(pid)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND pid <> pg_backend_pid()
+            """))
+            # Drop and recreate the schema — clears all tables, types, sequences
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+            conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
 
-                # Execute in AUTOCOMMIT mode for DDL operations
-                connection = connection.execution_options(isolation_level="AUTOCOMMIT")
-
-                # Get all custom enum types
-                try:
-                    result = connection.execute(text("""
-                        SELECT t.typname
-                        FROM pg_type t
-                        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-                        WHERE t.typtype = 'e'
-                        AND n.nspname = 'public'
-                    """))
-
-                    enum_types = [row[0] for row in result.fetchall()]
-
-                    # Drop each enum type with CASCADE
-                    for enum_type in enum_types:
-                        try:
-                            connection.execute(text(f'DROP TYPE IF EXISTS "{enum_type}" CASCADE'))
-                        except Exception as e:
-                            # If drop fails, just log and continue
-                            print(f"Warning: Could not drop enum {enum_type}: {e}")
-                except Exception as e:
-                    # If we can't query enums (e.g., using SQLite), just continue
-                    if 'no such table: pg_type' not in str(e).lower():
-                        print(f"Warning: Could not query/drop enums: {e}")
-        except Exception as e:
-            print(f"Warning: Could not clean up enums: {e}")
-
-        # Drop all tables AFTER dropping enums
-        try:
-            db_instance.drop_all()
-        except Exception as e:
-            print(f"Warning: Error dropping tables: {e}")
     except Exception as e:
         print(f"Warning: Error during database cleanup: {e}")
 
 
-@pytest.fixture
-def app():
-    """Create and configure a new app instance for each test."""
+def _truncate_all_tables():
+    """Delete all rows and reset sequences — much faster than TRUNCATE CASCADE on this system."""
+    try:
+        with db.engine.connect() as conn:
+            conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+            # Delete in FK dependency order (children before parents)
+            conn.execute(text("""
+                DELETE FROM agent_links;
+                DELETE FROM agent_memory;
+                DELETE FROM agent_runs;
+                DELETE FROM events;
+                DELETE FROM job_chains;
+                DELETE FROM job_runs;
+                DELETE FROM jobs;
+                DELETE FROM credentials;
+                DELETE FROM scenarios;
+                DELETE FROM users;
+                ALTER SEQUENCE agent_links_id_seq RESTART WITH 1;
+                ALTER SEQUENCE agent_memory_id_seq RESTART WITH 1;
+                ALTER SEQUENCE agent_runs_id_seq RESTART WITH 1;
+                ALTER SEQUENCE events_id_seq RESTART WITH 1;
+                ALTER SEQUENCE job_chains_id_seq RESTART WITH 1;
+                ALTER SEQUENCE job_runs_id_seq RESTART WITH 1;
+                ALTER SEQUENCE jobs_id_seq RESTART WITH 1;
+                ALTER SEQUENCE credentials_id_seq RESTART WITH 1;
+                ALTER SEQUENCE scenarios_id_seq RESTART WITH 1;
+                ALTER SEQUENCE users_id_seq RESTART WITH 1;
+            """))
+    except Exception as e:
+        print(f"Warning: Error clearing tables: {e}")
 
-    # Create the app with testing configuration
+
+@pytest.fixture(scope='session')
+def app():
+    """Create the app once for the entire test session."""
     app = create_app('testing')
 
-    # Ensure the app context is available
     with app.app_context():
-        # Clean up any leftover data from previous failed tests
-        # Always do a thorough cleanup before creating tables
-        drop_all_with_enums(db)
-
-        # Create all database tables
+        # Clean start: drop everything and recreate schema once
+        _drop_all_with_enums()
         db.create_all()
 
         yield app
 
-        # Clean up database after each test
+        # Final cleanup at end of session
         db.session.remove()
-        drop_all_with_enums(db)
+        _drop_all_with_enums()
+
+
+@pytest.fixture(autouse=True)
+def clean_tables(app):
+    """Truncate all tables before each test for clean isolation.
+
+    Uses the session-scoped app context directly — no nested context push,
+    which prevents the outer session from holding locks that block TRUNCATE.
+    """
+    db.session.remove()
+    _truncate_all_tables()
+    # Clear Flask-Login's cached current_user from g — it's bound to the persistent
+    # session-scoped app context, so it survives between test requests otherwise.
+    if hasattr(g, '_login_user'):
+        del g._login_user
+    # Reset class-level state that accumulates across tests
+    try:
+        from app.agents.types.discord_webhook_agent import DiscordWebhookAgent
+        DiscordWebhookAgent._rate_limit_tracker.clear()
+    except ImportError:
+        pass
+    yield
+    db.session.remove()
 
 
 @pytest.fixture
@@ -105,10 +121,8 @@ def runner(app):
 def app_context(app):
     """Application context for testing.
 
-    This fixture depends on the app fixture to ensure proper database cleanup.
-    It simply returns the app which already has its context active.
+    Returns the session-scoped app whose context is already active.
     """
-    # The app fixture already has app_context active, so just return it
     return app
 
 
@@ -116,18 +130,16 @@ def app_context(app):
 def db_session(app):
     """Database session for testing."""
     with app.app_context():
-        # Start with a clean transaction state
         try:
             db.session.rollback()
-        except:
+        except Exception:
             pass
 
         yield db.session
 
-        # Always clean up after test, even on error
         try:
             db.session.rollback()
-        except:
+        except Exception:
             pass
         finally:
             db.session.remove()
@@ -164,10 +176,9 @@ def test_job(app, test_user):
     from app.models import Job
 
     with app.app_context():
-        # Create a test job (using agent system)
         job = Job(
             name='Test Agent',
-            job_type='rss_agent',  # Use valid agent type
+            job_type='rss_agent',
             config={'feed_url': 'https://example.com/feed'},
             user_id=test_user.id
         )
@@ -175,8 +186,6 @@ def test_job(app, test_user):
         db.session.commit()
 
         yield job
-
-        # Cleanup is handled by app fixture
 
 
 @pytest.fixture
@@ -191,8 +200,6 @@ def test_user(app):
 
         yield user
 
-        # Cleanup is handled by app fixture
-
 
 @pytest.fixture
 def test_user2(app):
@@ -206,13 +213,10 @@ def test_user2(app):
 
         yield user
 
-        # Cleanup is handled by app fixture
-
 
 @pytest.fixture
 def authenticated_client(client, test_user):
     """A test client that's already logged in."""
-    # Login the test user
     client.post('/auth/login', data={
         'username': 'testuser',
         'password': 'password123'
@@ -275,4 +279,4 @@ def sample_events(app, test_job):
             db.session.add(event)
         db.session.commit()
 
-        yield events 
+        yield events

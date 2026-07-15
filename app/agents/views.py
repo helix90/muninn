@@ -12,7 +12,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.services.agent_service import AgentService
 from app.agents.registry import agent_registry
-from app.models import Job, AgentLink
+from app.models import Job, AgentLink, Scenario
 from app.scheduler import scheduler
 
 # Create blueprint
@@ -30,6 +30,7 @@ def agent_list():
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
+        scenario_id = request.args.get('scenario', type=int)
 
         # Get agent service
         agent_service = AgentService(db.session)
@@ -40,6 +41,10 @@ def agent_list():
         # Filter for agent types only
         agent_types = agent_registry.get_registered_types()
         query = query.filter(Job.job_type.in_(agent_types))
+
+        # Filter by scenario if provided
+        if scenario_id:
+            query = query.filter(Job.scenario_id == scenario_id)
 
         # Pagination
         pagination = query.order_by(Job.created_at.desc()).paginate(
@@ -55,10 +60,18 @@ def agent_list():
                 'stats': stats
             })
 
+        # Get scenarios for dropdown
+        scenarios = db.session.query(Scenario).filter_by(
+            user_id=user_id,
+            is_active=True
+        ).order_by(Scenario.name).all()
+
         return render_template('agents/list.html',
                              agents=agents_with_stats,
                              pagination=pagination,
-                             agent_types=agent_registry.get_registered_types())
+                             agent_types=agent_registry.get_registered_types(),
+                             scenarios=scenarios,
+                             selected_scenario=scenario_id)
 
     except Exception as e:
         logger.error(f"Error in agent_list: {e}", exc_info=True)
@@ -87,6 +100,13 @@ def create_agent():
             name = request.form.get('name', '').strip()
             agent_type = request.form.get('agent_type', '')
             schedule = request.form.get('schedule', '').strip()
+            scenario_id = request.form.get('scenario_id', type=int)
+
+            # Get scenarios for dropdown (needed for error cases)
+            scenarios = db.session.query(Scenario).filter_by(
+                user_id=user_id,
+                is_active=True
+            ).order_by(Scenario.name).all()
 
             # Validate required fields
             if not name:
@@ -94,14 +114,16 @@ def create_agent():
                 return render_template('agents/create.html',
                                      source_agents=source_agents,
                                      transform_agents=transform_agents,
-                                     action_agents=action_agents)
+                                     action_agents=action_agents,
+                                     scenarios=scenarios)
 
             if not agent_type:
                 flash('Agent type is required', 'error')
                 return render_template('agents/create.html',
                                      source_agents=source_agents,
                                      transform_agents=transform_agents,
-                                     action_agents=action_agents)
+                                     action_agents=action_agents,
+                                     scenarios=scenarios)
 
             # Get agent-specific configuration from form
             config = {}
@@ -124,6 +146,7 @@ def create_agent():
                                      source_agents=source_agents,
                                      transform_agents=transform_agents,
                                      action_agents=action_agents,
+                                     scenarios=scenarios,
                                      name=name,
                                      agent_type=agent_type,
                                      config=config)
@@ -133,7 +156,8 @@ def create_agent():
                 name=name,
                 job_type=agent_type,
                 config=config,
-                user_id=user_id
+                user_id=user_id,
+                scenario_id=scenario_id if scenario_id else None
             )
 
             # Set schedule and is_active as attributes (not constructor params)
@@ -157,11 +181,17 @@ def create_agent():
             flash(f'Agent "{name}" created successfully', 'success')
             return redirect(url_for('agents.agent_detail', agent_id=agent.id))
 
-        # GET request
+        # GET request - get scenarios for dropdown
+        scenarios = db.session.query(Scenario).filter_by(
+            user_id=user_id,
+            is_active=True
+        ).order_by(Scenario.name).all()
+
         return render_template('agents/create.html',
                              source_agents=source_agents,
                              transform_agents=transform_agents,
-                             action_agents=action_agents)
+                             action_agents=action_agents,
+                             scenarios=scenarios)
 
     except Exception as e:
         logger.error(f"Error in create_agent: {e}", exc_info=True)
@@ -197,6 +227,13 @@ def edit_agent(agent_id):
             # Process form submission
             name = request.form.get('name', '').strip()
             schedule = request.form.get('schedule', '').strip()
+            scenario_id = request.form.get('scenario_id', type=int)
+
+            # Get scenarios for dropdown (needed for error cases)
+            scenarios = db.session.query(Scenario).filter_by(
+                user_id=user_id,
+                is_active=True
+            ).order_by(Scenario.name).all()
 
             # Validate required fields
             if not name:
@@ -205,7 +242,8 @@ def edit_agent(agent_id):
                                      agent=agent,
                                      source_agents=source_agents,
                                      transform_agents=transform_agents,
-                                     action_agents=action_agents)
+                                     action_agents=action_agents,
+                                     scenarios=scenarios)
 
             # Get agent-specific configuration from form
             config = {}
@@ -229,12 +267,14 @@ def edit_agent(agent_id):
                                      source_agents=source_agents,
                                      transform_agents=transform_agents,
                                      action_agents=action_agents,
+                                     scenarios=scenarios,
                                      name=name,
                                      config=config)
 
             # Update agent
             agent.name = name
             agent.config = config
+            agent.scenario_id = scenario_id if scenario_id else None
 
             # Update schedule
             if schedule:
@@ -271,12 +311,18 @@ def edit_agent(agent_id):
             flash(f'Agent "{name}" updated successfully', 'success')
             return redirect(url_for('agents.agent_detail', agent_id=agent.id))
 
-        # GET request - show edit form
+        # GET request - show edit form - get scenarios for dropdown
+        scenarios = db.session.query(Scenario).filter_by(
+            user_id=user_id,
+            is_active=True
+        ).order_by(Scenario.name).all()
+
         return render_template('agents/edit.html',
                              agent=agent,
                              source_agents=source_agents,
                              transform_agents=transform_agents,
-                             action_agents=action_agents)
+                             action_agents=action_agents,
+                             scenarios=scenarios)
 
     except Exception as e:
         logger.error(f"Error in edit_agent: {e}", exc_info=True)
@@ -518,12 +564,23 @@ def test_agent_connection(agent_id):
             flash('Connection testing is only available for Jabber agents', 'error')
             return redirect(url_for('agents.agent_detail', agent_id=agent_id))
 
-        # Create agent instance
+        # Resolve credentials before creating agent instance
         from app.agents.registry import agent_registry
+        from app.services.credential_service import CredentialService
+        credential_service = CredentialService(db.session)
+        try:
+            resolved_config = credential_service.resolve_credentials_in_config(
+                agent_model.config,
+                agent_model.user_id,
+            )
+        except ValueError as e:
+            flash(f'Credential resolution failed: {e}', 'error')
+            return redirect(url_for('agents.agent_detail', agent_id=agent_id))
+
         agent = agent_registry.create_agent(
             agent_type=agent_model.job_type,
             agent_id=agent_model.id,
-            config=agent_model.config,
+            config=resolved_config,
             user_id=agent_model.user_id,
             db_session=db.session
         )
@@ -713,12 +770,19 @@ def pipeline():
     """Show agent pipeline visualization."""
     try:
         user_id = current_user.id
+        scenario_id = request.args.get('scenario', type=int)
 
         # Get all user's agents
-        agents_query = db.session.query(Job).filter(
+        query = db.session.query(Job).filter(
             Job.user_id == user_id,
             Job.is_active == True
-        ).all()
+        )
+
+        # Filter by scenario if provided
+        if scenario_id:
+            query = query.filter(Job.scenario_id == scenario_id)
+
+        agents_query = query.all()
 
         # Build agent data with categories
         agents_data = []
@@ -762,9 +826,17 @@ def pipeline():
             'target_agent_id': link.target_agent_id
         } for link in links_query]
 
+        # Get scenarios for dropdown
+        scenarios = db.session.query(Scenario).filter_by(
+            user_id=user_id,
+            is_active=True
+        ).order_by(Scenario.name).all()
+
         return render_template('agents/pipeline.html',
                              agents=agents_data,
-                             links=links_data)
+                             links=links_data,
+                             scenarios=scenarios,
+                             selected_scenario=scenario_id)
 
     except Exception as e:
         logger.error(f"Error in pipeline view: {e}", exc_info=True)

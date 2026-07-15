@@ -96,7 +96,8 @@ def execute_scheduled_job(job_id: int):
         random.seed(seed_value)
 
         # Get jitter range from scheduler config if available
-        from app.scheduler import scheduler as scheduler_instance
+        # Reference module-level scheduler directly so @patch mocking works correctly
+        scheduler_instance = scheduler
         if scheduler_instance.app:
             jitter_min = scheduler_instance.app.config.get('SCHEDULER_JITTER_MIN_SECONDS', 0)
             jitter_max = scheduler_instance.app.config.get('SCHEDULER_JITTER_MAX_SECONDS', 60)
@@ -122,7 +123,7 @@ def execute_scheduled_job(job_id: int):
         with scheduler_instance.app.app_context():
             # Get job from database
             from app.models import Job
-            job = db.session.query(Job).get(job_id)
+            job = db.session.get(Job, job_id)
             if not job:
                 logger.error(f"Job/Agent {job_id} not found")
                 return
@@ -394,7 +395,7 @@ class JobScheduler:
             job_info = {
                 'id': job.id,
                 'name': job.name,
-                'next_run_time': job.next_run_time,
+                'next_run_time': job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else None,
                 'trigger': str(job.trigger),
                 'job_id': self._extract_job_id_from_name(job.id)
             }
@@ -412,7 +413,7 @@ class JobScheduler:
                 return {
                     'id': job.id,
                     'name': job.name,
-                    'next_run_time': job.next_run_time,
+                    'next_run_time': job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else None,
                     'trigger': str(job.trigger),
                     'scheduled': True
                 }
@@ -425,7 +426,7 @@ class JobScheduler:
     def _get_job(self, job_id: int):
         """Get job from database."""
         from app.models import Job
-        return db.session.query(Job).get(job_id)
+        return db.session.get(Job, job_id)
     
     def _validate_cron_expression(self, cron_expression: str) -> bool:
         """Validate cron expression."""
@@ -439,7 +440,7 @@ class JobScheduler:
         """Update the next scheduled run time for a job."""
         try:
             from app.models import Job
-            job = db.session.query(Job).get(job_id)
+            job = db.session.get(Job, job_id)
             if job:
                 # Calculate next run time
                 now = datetime.utcnow()
@@ -457,7 +458,7 @@ class JobScheduler:
         """Update job scheduling status in database."""
         try:
             from app.models import Job
-            job = db.session.query(Job).get(job_id)
+            job = db.session.get(Job, job_id)
             if job:
                 job.schedule_enabled = enabled
                 if not enabled:

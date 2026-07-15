@@ -2,7 +2,8 @@
 Database models for Muninn automation platform
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime,
     ForeignKey, JSON, Index, CheckConstraint
@@ -31,7 +32,9 @@ class User(UserMixin, db.Model):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     theme_preference = Column(String(10), nullable=True)  # 'light', 'dark', 'system', or NULL
-    
+    reset_token = Column(String(64), nullable=True, index=True)
+    reset_token_expiry = Column(DateTime, nullable=True)
+
     # Relationships
     jobs = relationship('Job', back_populates='user', cascade='all, delete-orphan')
     
@@ -66,6 +69,27 @@ class User(UserMixin, db.Model):
             raise ValueError("Invalid email format")
         return email.lower()
 
+    def generate_reset_token(self):
+        """Generate a secure password reset token valid for 1 hour."""
+        self.reset_token = secrets.token_urlsafe(48)
+        self.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+        return self.reset_token
+
+    @classmethod
+    def verify_reset_token(cls, token):
+        """Return user if token is valid and not expired, else None."""
+        user = cls.query.filter_by(reset_token=token).first()
+        if user is None or user.reset_token_expiry is None:
+            return None
+        if datetime.utcnow() > user.reset_token_expiry:
+            return None
+        return user
+
+    def clear_reset_token(self):
+        """Invalidate the reset token after use."""
+        self.reset_token = None
+        self.reset_token_expiry = None
+
     def get_id(self):
         """Return user ID as string for Flask-Login."""
         return str(self.id)
@@ -89,10 +113,11 @@ class Job(db.Model):
     job_type = Column(String(50), nullable=False, index=True)  # Changed from ENUM to String for agent system flexibility
     config = Column(JSON, nullable=False, default=dict)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    scenario_id = Column(Integer, ForeignKey('scenarios.id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    
+
     # Scheduling fields
     description = Column(Text, nullable=True)
     tags = Column(JSON, nullable=True)
@@ -119,13 +144,14 @@ class Job(db.Model):
         Index('idx_jobs_created_active', 'created_at', 'is_active'),
     )
     
-    def __init__(self, name, job_type, config, user_id, description=None, tags=None, 
-                 priority=0, schedule_cron=None, schedule_enabled=False, 
-                 last_scheduled_run=None, next_scheduled_run=None):
+    def __init__(self, name, job_type, config, user_id, description=None, tags=None,
+                 priority=0, schedule_cron=None, schedule_enabled=False,
+                 last_scheduled_run=None, next_scheduled_run=None, scenario_id=None, is_active=True):
         self.name = name
         self.job_type = job_type
         self.config = config or {}
         self.user_id = user_id
+        self.scenario_id = scenario_id
         self.description = description
         self.tags = tags
         self.priority = priority
@@ -133,6 +159,7 @@ class Job(db.Model):
         self.schedule_enabled = schedule_enabled
         self.last_scheduled_run = last_scheduled_run
         self.next_scheduled_run = next_scheduled_run
+        self.is_active = is_active
     
     @validates('config')
     def validate_config(self, key, config):
@@ -209,6 +236,37 @@ class Job(db.Model):
     
     def __repr__(self):
         return f'<Job {self.name} ({self.job_type})>'
+
+
+class Scenario(db.Model):
+    """Groups of agents that work together on specific tasks"""
+    __tablename__ = 'scenarios'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    color = Column(String(7), nullable=True)  # Hex color for UI display
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship('User', backref='scenarios')
+    agents = relationship('Job', backref='scenario', lazy='dynamic')
+
+    # Constraints
+    __table_args__ = (
+        db.Index('ix_scenarios_user_name', 'user_id', 'name', unique=True),
+    )
+
+    def __repr__(self):
+        return f'<Scenario {self.name} (user {self.user_id})>'
+
+    @property
+    def agent_count(self):
+        """Get count of agents in this scenario"""
+        return self.agents.filter(Job.is_active == True).count()
 
 
 class JobRun(db.Model):

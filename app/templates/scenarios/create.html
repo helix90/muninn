@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Create Scenario - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-2xl">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Create Scenario</h1>
+
+    <form method="POST" class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div class="mb-6">
+            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Name <span class="text-red-500">*</span>
+            </label>
+            <input type="text" id="name" name="name" required
+                   value="{{ name or '' }}"
+                   maxlength="100"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., Weather Monitoring">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                A descriptive name for this scenario
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+            </label>
+            <textarea id="description" name="description" rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional description of what this scenario is for">{{ description or '' }}</textarea>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Explain what this scenario is used for
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <label for="color" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Color
+            </label>
+            <div class="flex items-center space-x-3">
+                <input type="color" id="color" name="color"
+                       value="{{ color or '#3B82F6' }}"
+                       class="h-10 w-20 border border-gray-300 dark:border-gray-600 rounded cursor-pointer">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Choose a color to identify this scenario</span>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+            <a href="{{ url_for('scenarios.scenario_list') }}"
+               class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 font-medium">
+                Create Scenario
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-6 bg-blue-50 dark:bg-gray-700 border-l-4 border-blue-500 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-gray-700 dark:text-gray-300">
+                    <strong>Tip:</strong> Scenarios help group agents that work together on specific tasks. After creating a scenario, assign agents to it when creating or editing them.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

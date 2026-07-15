@@ -12,6 +12,32 @@
         </a>
     </div>
 
+    <!-- Scenario Filter -->
+    <div class="mb-4 flex items-center space-x-4">
+        <label for="scenario-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Filter by Scenario:
+        </label>
+        <select id="scenario-filter"
+                class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                onchange="window.location.href = this.value;">
+            <option value="{{ url_for('agents.agent_list') }}" {% if not selected_scenario %}selected{% endif %}>
+                All Agents
+            </option>
+            {% for scenario in scenarios %}
+            <option value="{{ url_for('agents.agent_list') }}?scenario={{ scenario.id }}"
+                    {% if selected_scenario == scenario.id %}selected{% endif %}>
+                {{ scenario.name }} ({{ scenario.agent_count }} agents)
+            </option>
+            {% endfor %}
+        </select>
+        {% if selected_scenario %}
+        <a href="{{ url_for('agents.agent_list') }}"
+           class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+            Clear filter
+        </a>
+        {% endif %}
+    </div>
+
     <!-- Agent List -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
         {% if agents %}
@@ -94,7 +120,7 @@
                             <div class="flex flex-col">
                                 <span class="text-green-600 dark:text-green-500 font-medium">{{ stats.successful_runs }}</span>
                                 {% if stats.failed_runs > 0 %}
-                                <span class="text-red-600 dark:text-red-500">{{ stats.failed_runs }} failed</span>
+                                <span class="text-red-600 dark:text-red-500">{{ stats.failed_runs }} failed ({{ stats.failure_window_days }}d)</span>
                                 {% endif %}
                             </div>
                         </td>

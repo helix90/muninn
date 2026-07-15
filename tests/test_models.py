@@ -5,7 +5,7 @@ Tests for database models
 import pytest
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
-from app.models import User, Job, JobRun, JobChain
+from app.models import User, Job, JobRun, JobChain, AgentRun
 from app.extensions import db
 
 
@@ -695,4 +695,102 @@ class TestModelConstraints:
         db.session.commit()
         
         # updated_at should be automatically updated
-        assert user.updated_at > original_updated_at 
+        assert user.updated_at > original_updated_at
+
+
+class TestAgentStatisticsFailureWindow:
+    """Test that get_agent_statistics() scopes failed_runs to the recent window."""
+
+    def _make_agent(self, db_session, user):
+        agent = Job(
+            name='Stats Test Agent',
+            job_type='rss_agent',
+            config={'feed_url': 'https://example.com/feed'},
+            user_id=user.id
+        )
+        db_session.add(agent)
+        db_session.commit()
+        return agent
+
+    def _make_run(self, db_session, agent_id, status, started_at):
+        run = AgentRun(
+            agent_id=agent_id,
+            status=status,
+            started_at=started_at,
+            completed_at=started_at
+        )
+        db_session.add(run)
+        db_session.commit()
+        return run
+
+    def test_recent_failures_are_counted(self, app, db_session, test_user):
+        """Failures within the window are included in failed_runs."""
+        from app.services.agent_service import AgentService
+
+        agent = self._make_agent(db_session, test_user)
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=1))
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=3))
+
+        with app.app_context():
+            service = AgentService(db_session)
+            stats = service.get_agent_statistics(agent.id)
+
+        assert stats['failed_runs'] == 2
+        assert stats['failure_window_days'] == 7
+
+    def test_old_failures_are_excluded(self, app, db_session, test_user):
+        """Failures older than the window are excluded from failed_runs."""
+        from app.services.agent_service import AgentService
+
+        agent = self._make_agent(db_session, test_user)
+        # One old failure (outside window) and one recent failure (inside window)
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=30))
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=2))
+
+        with app.app_context():
+            service = AgentService(db_session)
+            stats = service.get_agent_statistics(agent.id)
+
+        assert stats['failed_runs'] == 1  # only the recent one
+        assert stats['total_runs'] == 2   # both still counted in total
+
+    def test_all_old_failures_shows_zero(self, app, db_session, test_user):
+        """When all failures are outside the window, failed_runs is 0."""
+        from app.services.agent_service import AgentService
+
+        agent = self._make_agent(db_session, test_user)
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=14))
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=60))
+
+        with app.app_context():
+            service = AgentService(db_session)
+            stats = service.get_agent_statistics(agent.id)
+
+        assert stats['failed_runs'] == 0
+        assert stats['total_runs'] == 2
+
+    def test_custom_window_via_config(self, app, db_session, test_user):
+        """Overriding AGENT_FAILURE_WINDOW_DAYS in config shifts the cutoff."""
+        from app.services.agent_service import AgentService
+
+        agent = self._make_agent(db_session, test_user)
+        # A failure 10 days ago — outside default 7d window, inside a 30d window
+        self._make_run(db_session, agent.id, 'failed', datetime.utcnow() - timedelta(days=10))
+
+        with app.app_context():
+            # Default window (7 days): should not count the 10-day-old failure
+            service = AgentService(db_session)
+            stats_default = service.get_agent_statistics(agent.id)
+            assert stats_default['failed_runs'] == 0
+            assert stats_default['failure_window_days'] == 7
+
+        with app.app_context():
+            # Extended window (30 days): should count it
+            app.config['AGENT_FAILURE_WINDOW_DAYS'] = 30
+            try:
+                service = AgentService(db_session)
+                stats_wide = service.get_agent_statistics(agent.id)
+                assert stats_wide['failed_runs'] == 1
+                assert stats_wide['failure_window_days'] == 30
+            finally:
+                app.config['AGENT_FAILURE_WINDOW_DAYS'] = 7  # restore default 

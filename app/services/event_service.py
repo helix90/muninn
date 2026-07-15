@@ -234,12 +234,28 @@ class EventService:
         self.db_session.add(agent_run)
         self.db_session.flush()  # Get the agent_run.id
 
+        # Resolve credentials before instantiating the agent
+        from app.services.credential_service import CredentialService
+        credential_service = CredentialService(self.db_session)
+        try:
+            resolved_config = credential_service.resolve_credentials_in_config(
+                agent_model.config,
+                agent_model.user_id,
+            )
+        except ValueError as e:
+            logger.error(f'Failed to resolve credentials for agent {agent_model.id}: {e}')
+            agent_run.status = 'failed'
+            agent_run.completed_at = datetime.utcnow()
+            agent_run.error_message = f'Credential resolution failed: {e}'
+            self.db_session.commit()
+            return []
+
         # Create agent instance
         try:
             agent = agent_registry.create_agent(
                 agent_type=agent_model.job_type,
                 agent_id=agent_model.id,
-                config=agent_model.config,
+                config=resolved_config,
                 user_id=agent_model.user_id,
                 db_session=self.db_session
             )

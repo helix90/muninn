@@ -3,7 +3,7 @@ Authentication forms for Muninn application
 """
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, EmailField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from app.models import User
 from app.extensions import db
@@ -50,6 +50,40 @@ class RegistrationForm(FlaskForm):
         """Check if email is already registered."""
         if db.session.query(User).filter_by(email=field.data.lower()).first():
             raise ValidationError('Email already registered. Please use a different email.')
+
+
+class ForgotUsernameForm(FlaskForm):
+    """Form to look up username by email."""
+
+    email = StringField('Email', validators=[
+        DataRequired(),
+        Email(message='Please enter a valid email address')
+    ])
+    submit = SubmitField('Find My Username')
+
+
+class ForgotPasswordForm(FlaskForm):
+    """Form to request a password reset."""
+
+    email = StringField('Email', validators=[
+        DataRequired(),
+        Email(message='Please enter a valid email address')
+    ])
+    submit = SubmitField('Get Reset Link')
+
+
+class ResetPasswordForm(FlaskForm):
+    """Form to set a new password via reset token."""
+
+    new_password = PasswordField('New Password', validators=[
+        DataRequired(),
+        Length(min=MIN_PASSWORD_LENGTH, message=f'Password must be at least {MIN_PASSWORD_LENGTH} characters')
+    ])
+    confirm_password = PasswordField('Confirm New Password', validators=[
+        DataRequired(),
+        EqualTo('new_password', message='Passwords must match')
+    ])
+    submit = SubmitField('Reset Password')
 
 
 class ChangePasswordForm(FlaskForm):

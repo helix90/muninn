@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Scenarios - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Scenarios</h1>
+        <div class="space-x-3">
+            <a href="{{ url_for('scenarios.import_scenario_view') }}"
+               class="bg-gray-600 dark:bg-gray-500 hover:bg-gray-700 dark:hover:bg-gray-400 text-white font-bold py-2 px-4 rounded">
+                Import Scenario
+            </a>
+            <a href="{{ url_for('scenarios.create_scenario') }}"
+               class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                Create Scenario
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        {% if scenarios %}
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Agents</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for scenario in scenarios %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full mr-3" style="background-color: {{ scenario.color or '#3B82F6' }}"></div>
+                            <a href="{{ url_for('scenarios.scenario_detail', scenario_id=scenario.id) }}"
+                               class="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400">
+                                {{ scenario.name }}
+                            </a>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        {{ scenario.description or '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <a href="{{ url_for('scenarios.scenario_detail', scenario_id=scenario.id) }}"
+                           class="text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ scenario.agent_count }} agent{{ 's' if scenario.agent_count != 1 else '' }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="{{ url_for('scenarios.edit_scenario', scenario_id=scenario.id) }}"
+                           class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4">Edit</a>
+                        <a href="{{ url_for('agents.pipeline', scenario=scenario.id) }}"
+                           class="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-4">View Pipeline</a>
+                        <form method="POST" action="{{ url_for('scenarios.delete_scenario', scenario_id=scenario.id) }}"
+                              class="inline" onsubmit="return confirm('Delete this scenario? Agents will become unassigned.');">
+                            <button type="submit"
+                                    class="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            <p class="text-gray-500 dark:text-gray-400 mt-4 mb-4">No scenarios yet</p>
+            <a href="{{ url_for('scenarios.create_scenario') }}"
+               class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
+                Create your first scenario
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="mt-6 bg-blue-50 dark:bg-gray-700 border-l-4 border-blue-500 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-gray-700 dark:text-gray-300">
+                    <strong>Tip:</strong> Scenarios help organize agents that work together. Assign agents to scenarios when creating/editing them, then filter the pipeline view by scenario.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

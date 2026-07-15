@@ -16,7 +16,7 @@ class TestAppFactory:
         app = create_app()
         assert app.config['DEBUG'] is True
         assert app.config['TESTING'] is False
-        assert app.config['SECRET_KEY'] == 'dev-secret-key-change-in-production'
+        assert app.config['SECRET_KEY'] == 'your-super-secret-key-change-this-in-production'
     
     def test_create_app_development_config(self):
         """Test app creation with development configuration."""

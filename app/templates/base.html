@@ -91,6 +91,10 @@
                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Agents
                         </a>
+                        <a href="{{ url_for('scenarios.scenario_list') }}"
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Scenarios
+                        </a>
                         <a href="{{ url_for('agents.pipeline') }}"
                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Pipeline
@@ -204,7 +208,7 @@
     <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-16">
         <div class="max-w-7xl mx-auto py-6 px-4">
             <div class="text-center text-sm text-gray-500 dark:text-gray-400">
-                <p>&copy; 2024 Muninn. All rights reserved.</p>
+                <p>&copy; {{ current_year }} Muninn. All rights reserved.</p>
             </div>
         </div>
     </footer>

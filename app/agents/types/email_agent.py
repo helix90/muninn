@@ -121,7 +121,7 @@ class EmailAgent(ActionAgent):
         use_tls = current_app.config.get('SMTP_USE_TLS', True)
         username = current_app.config['SMTP_USERNAME']
         password = current_app.config['SMTP_PASSWORD']
-        from_email = current_app.config.get('SMTP_FROM_EMAIL', username)  # Default to username if not set
+        from_email = current_app.config.get('SMTP_FROM_EMAIL', username)
 
         # Get per-agent settings
         html = self.config.get('html', False)

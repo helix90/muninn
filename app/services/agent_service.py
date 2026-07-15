@@ -5,7 +5,7 @@ Handles execution of individual agents and integration with event propagation.
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from app.models import Job, AgentRun, Event
 from app.agents.registry import agent_registry
@@ -237,9 +237,15 @@ class AgentService:
             agent_id: Agent ID
 
         Returns:
-            Dictionary with statistics
+            Dictionary with statistics. 'failed_runs' reflects only the recent
+            window defined by AGENT_FAILURE_WINDOW_DAYS (default 7 days).
         """
         from sqlalchemy import func
+        from flask import current_app
+        from app.constants import AGENT_FAILURE_WINDOW_DAYS
+
+        window_days = current_app.config.get('AGENT_FAILURE_WINDOW_DAYS', AGENT_FAILURE_WINDOW_DAYS)
+        cutoff = datetime.utcnow() - timedelta(days=window_days)
 
         # Total runs
         total_runs = self.db_session.query(func.count(AgentRun.id)).filter(
@@ -252,10 +258,11 @@ class AgentService:
             AgentRun.status == 'completed'
         ).scalar()
 
-        # Failed runs
+        # Failed runs — only within the recent window
         failed_runs = self.db_session.query(func.count(AgentRun.id)).filter(
             AgentRun.agent_id == agent_id,
-            AgentRun.status == 'failed'
+            AgentRun.status == 'failed',
+            AgentRun.started_at >= cutoff
         ).scalar()
 
         # Last run
@@ -273,6 +280,7 @@ class AgentService:
             'total_runs': total_runs or 0,
             'successful_runs': successful_runs or 0,
             'failed_runs': failed_runs or 0,
+            'failure_window_days': window_days,
             'success_rate': (successful_runs / total_runs * 100) if total_runs > 0 else 0,
             'total_events_created': total_events or 0,
             'last_run_at': last_run.started_at if last_run else None,

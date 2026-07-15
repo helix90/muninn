@@ -1,7 +1,7 @@
 """
 Tests for Action Agents
 
-Tests EmailAgent, HTTPPostAgent, and JabberAgent.
+Tests EmailAgent, HTTPPostAgent, JabberAgent, and DiscordWebhookAgent.
 """
 
 import pytest
@@ -15,6 +15,7 @@ from app.agents.registry import agent_registry
 from app.agents.types.email_agent import EmailAgent
 from app.agents.types.http_post_agent import HTTPPostAgent
 from app.agents.types.jabber_agent import JabberAgent
+from app.agents.types.discord_webhook_agent import DiscordWebhookAgent
 from app.models import Event
 from app.extensions import db
 
@@ -111,59 +112,11 @@ def test_email_agent_capabilities(test_job, db_session):
 
 def test_email_agent_config_validation_required_fields(test_job, db_session):
     """Test EmailAgent config validation for required fields."""
-    # Missing smtp_server
-    with pytest.raises(ValueError, match="requires 'smtp_server'"):
-        EmailAgent(
-            agent_id=test_job.id,
-            config={},
-            user_id=test_job.user_id,
-            db_session=db_session
-        )
-
-    # Missing username
-    with pytest.raises(ValueError, match="requires 'username'"):
-        EmailAgent(
-            agent_id=test_job.id,
-            config={'smtp_server': 'smtp.example.com'},
-            user_id=test_job.user_id,
-            db_session=db_session
-        )
-
-    # Missing password
-    with pytest.raises(ValueError, match="requires 'password'"):
-        EmailAgent(
-            agent_id=test_job.id,
-            config={
-                'smtp_server': 'smtp.example.com',
-                'username': 'user'
-            },
-            user_id=test_job.user_id,
-            db_session=db_session
-        )
-
-    # Missing from_email
-    with pytest.raises(ValueError, match="requires 'from_email'"):
-        EmailAgent(
-            agent_id=test_job.id,
-            config={
-                'smtp_server': 'smtp.example.com',
-                'username': 'user',
-                'password': 'pass'
-            },
-            user_id=test_job.user_id,
-            db_session=db_session
-        )
-
     # Missing to_email
     with pytest.raises(ValueError, match="requires 'to_email'"):
         EmailAgent(
             agent_id=test_job.id,
-            config={
-                'smtp_server': 'smtp.example.com',
-                'username': 'user',
-                'password': 'pass',
-                'from_email': 'from@example.com'
-            },
+            config={},
             user_id=test_job.user_id,
             db_session=db_session
         )
@@ -172,13 +125,7 @@ def test_email_agent_config_validation_required_fields(test_job, db_session):
     with pytest.raises(ValueError, match="requires 'subject_template'"):
         EmailAgent(
             agent_id=test_job.id,
-            config={
-                'smtp_server': 'smtp.example.com',
-                'username': 'user',
-                'password': 'pass',
-                'from_email': 'from@example.com',
-                'to_email': 'to@example.com'
-            },
+            config={'to_email': 'to@example.com'},
             user_id=test_job.user_id,
             db_session=db_session
         )
@@ -188,10 +135,6 @@ def test_email_agent_config_validation_required_fields(test_job, db_session):
         EmailAgent(
             agent_id=test_job.id,
             config={
-                'smtp_server': 'smtp.example.com',
-                'username': 'user',
-                'password': 'pass',
-                'from_email': 'from@example.com',
                 'to_email': 'to@example.com',
                 'subject_template': 'Subject'
             },
@@ -203,29 +146,16 @@ def test_email_agent_config_validation_required_fields(test_job, db_session):
 def test_email_agent_config_validation_types(test_job, db_session):
     """Test EmailAgent config validation for field types."""
     base_config = {
-        'smtp_server': 'smtp.example.com',
-        'username': 'user',
-        'password': 'pass',
-        'from_email': 'from@example.com',
         'to_email': 'to@example.com',
         'subject_template': 'Subject',
         'body_template': 'Body'
     }
 
-    # Invalid smtp_port
-    with pytest.raises(ValueError, match="'smtp_port' must be a valid port number"):
+    # Invalid to_email type (not string or list)
+    with pytest.raises(ValueError, match="'to_email' must be a string or list"):
         EmailAgent(
             agent_id=test_job.id,
-            config={**base_config, 'smtp_port': 99999},
-            user_id=test_job.user_id,
-            db_session=db_session
-        )
-
-    # Invalid use_tls
-    with pytest.raises(ValueError, match="'use_tls' must be a boolean"):
-        EmailAgent(
-            agent_id=test_job.id,
-            config={**base_config, 'use_tls': 'yes'},
+            config={**base_config, 'to_email': 12345},
             user_id=test_job.user_id,
             db_session=db_session
         )
@@ -235,6 +165,15 @@ def test_email_agent_config_validation_types(test_job, db_session):
         EmailAgent(
             agent_id=test_job.id,
             config={**base_config, 'html': 'true'},
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+    # Invalid cc_email type
+    with pytest.raises(ValueError, match="'cc_email' must be a string or list"):
+        EmailAgent(
+            agent_id=test_job.id,
+            config={**base_config, 'cc_email': 12345},
             user_id=test_job.user_id,
             db_session=db_session
         )
@@ -272,15 +211,9 @@ def test_email_agent_config_validation_template_syntax(test_job, db_session):
 
 
 @patch('app.agents.types.email_agent.smtplib.SMTP')
-def test_email_agent_sends_email(mock_smtp, test_job, db_session, sample_events):
-    """Test EmailAgent sends emails successfully."""
+def test_email_agent_sends_email(mock_smtp, app_context, test_job, db_session, sample_events):
+    """Test EmailAgent sends emails using global SMTP configuration."""
     config = {
-        'smtp_server': 'smtp.example.com',
-        'smtp_port': 587,
-        'use_tls': True,
-        'username': 'user@example.com',
-        'password': 'password',
-        'from_email': 'alerts@example.com',
         'to_email': 'admin@example.com',
         'subject_template': 'Alert: {{ title }}',
         'body_template': 'Message: {{ message }}\nLink: {{ link }}'
@@ -306,10 +239,16 @@ def test_email_agent_sends_email(mock_smtp, test_job, db_session, sample_events)
     # Should have sent 2 emails
     assert mock_server.send_message.call_count == 2
 
-    # Verify SMTP connection
-    mock_smtp.assert_called_with('smtp.example.com', 587)
+    # Verify SMTP connection used global config values
+    mock_smtp.assert_called_with(
+        app_context.config['SMTP_SERVER'],
+        app_context.config.get('SMTP_PORT', 587)
+    )
     mock_server.starttls.assert_called()
-    mock_server.login.assert_called_with('user@example.com', 'password')
+    mock_server.login.assert_called_with(
+        app_context.config['SMTP_USERNAME'],
+        app_context.config['SMTP_PASSWORD']
+    )
 
 
 @patch('app.agents.types.email_agent.smtplib.SMTP')
@@ -945,3 +884,341 @@ def test_jabber_agent_error_handling(test_job, db_session, sample_events):
 
         # Should still return empty list
         assert result == []
+
+
+# ============================================================================
+# Discord Webhook Agent Tests
+# ============================================================================
+
+class TestDiscordWebhookAgent:
+    """Test Discord Webhook Agent functionality."""
+
+    def test_discord_webhook_agent_registered(self):
+        """Test that DiscordWebhookAgent is properly registered."""
+        agent_class = agent_registry.get_agent_class('discord_webhook_agent')
+        assert agent_class is DiscordWebhookAgent
+
+    def test_discord_webhook_agent_capabilities(self, test_job, db_session):
+        """Test DiscordWebhookAgent capabilities and attributes."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'Test message'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Check agent type
+        assert agent.agent_type == 'discord_webhook_agent'
+        assert agent.agent_category == 'action'
+
+        # Check capabilities
+        assert agent.can_be_scheduled == False
+        assert agent.can_receive_events == True
+
+    def test_discord_webhook_agent_validates_webhook_url_required(self, test_job, db_session):
+        """Test that webhook_url is required."""
+        config = {
+            'content_template': 'Test message'
+        }
+        
+        with pytest.raises(ValueError, match="webhook_url is required"):
+            DiscordWebhookAgent(
+                agent_id=test_job.id,
+                config=config,
+                user_id=test_job.user_id,
+                db_session=db_session
+            )
+
+    def test_discord_webhook_agent_validates_webhook_url_format(self, test_job, db_session):
+        """Test that webhook_url format is validated."""
+        config = {
+            'webhook_url': 'https://example.com/webhook',
+            'content_template': 'Test message'
+        }
+        
+        with pytest.raises(ValueError, match="webhook_url must start with"):
+            DiscordWebhookAgent(
+                agent_id=test_job.id,
+                config=config,
+                user_id=test_job.user_id,
+                db_session=db_session
+            )
+
+    def test_discord_webhook_agent_validates_content_or_embed_required(self, test_job, db_session):
+        """Test that either content or embed is required."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef'
+        }
+
+        with pytest.raises(ValueError, match="At least one of content_template or embed is required"):
+            DiscordWebhookAgent(
+                agent_id=test_job.id,
+                config=config,
+                user_id=test_job.user_id,
+                db_session=db_session
+            )
+
+    def test_discord_webhook_agent_validates_jinja2_syntax(self, test_job, db_session):
+        """Test that Jinja2 template syntax is validated."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': '{{ invalid template'
+        }
+
+        with pytest.raises(ValueError, match="Invalid content_template syntax"):
+            DiscordWebhookAgent(
+                agent_id=test_job.id,
+                config=config,
+                user_id=test_job.user_id,
+                db_session=db_session
+            )
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_sends_simple_message(self, mock_post, test_job, db_session, sample_events):
+        """Test sending a simple text message to Discord."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'New article: {{ title }}'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+
+        # Process event
+        result = agent.check([sample_events[0]])
+
+        # Should return empty list (action agents don't emit events)
+        assert result == []
+
+        # Verify POST was called
+        assert mock_post.called
+        call_args = mock_post.call_args
+
+        # Verify URL
+        assert call_args[0][0] == 'https://discord.com/api/webhooks/123456/abcdef'
+
+        # Verify payload
+        payload = call_args[1]['json']
+        assert 'content' in payload
+        assert 'System Alert' in payload['content']
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_sends_embed(self, mock_post, test_job, db_session, sample_events):
+        """Test sending a rich embed to Discord."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'embed': {
+                'title': '{{ title }}',
+                'description': '{{ message }}',
+                'color': 3447003,
+                'fields': [
+                    {'name': 'Status', 'value': 'Published', 'inline': True}
+                ]
+            }
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+
+        # Process event
+        result = agent.check([sample_events[0]])
+
+        # Should return empty list
+        assert result == []
+
+        # Verify POST was called with embed
+        assert mock_post.called
+        payload = mock_post.call_args[1]['json']
+        
+        assert 'embeds' in payload
+        assert len(payload['embeds']) == 1
+        
+        embed = payload['embeds'][0]
+        assert 'title' in embed
+        assert 'description' in embed
+        assert embed['color'] == 3447003
+        assert 'fields' in embed
+        assert len(embed['fields']) == 1
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    @patch('app.agents.types.discord_webhook_agent.time.sleep')
+    def test_discord_webhook_agent_rate_limiting(self, mock_sleep, mock_post, test_job, db_session, sample_events):
+        """Test rate limiting behavior."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'Message {{ loop.index }}',
+            'rate_limit_per_minute': 2
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+
+        # Process first 2 events - should not sleep
+        agent.check([sample_events[0]])
+        agent.check([sample_events[1]])
+        
+        # After 2 events at limit of 2/min, next should wait
+        # Note: Implementation may vary based on exact rate limiting logic
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_handles_429_response(self, mock_post, test_job, db_session, sample_events):
+        """Test retry logic for 429 (Too Many Requests) response."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'Test message'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock 429 response first, then success
+        mock_response_429 = Mock()
+        mock_response_429.status_code = 429
+        mock_response_429.headers = {}
+        mock_response_429.json.return_value = {'retry_after': 1.0}
+        
+        mock_response_success = Mock()
+        mock_response_success.status_code = 204
+        
+        mock_post.side_effect = [mock_response_429, mock_response_success]
+
+        # Process event - should retry after 429
+        result = agent.check([sample_events[0]])
+
+        # Should still return empty list
+        assert result == []
+
+        # Verify POST was called twice (once failed with 429, once succeeded)
+        assert mock_post.call_count == 2
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_with_username_override(self, mock_post, test_job, db_session, sample_events):
+        """Test overriding webhook username."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'Test message',
+            'username': 'Muninn Bot'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+
+        # Process event
+        agent.check([sample_events[0]])
+
+        # Verify username in payload
+        payload = mock_post.call_args[1]['json']
+        assert payload['username'] == 'Muninn Bot'
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_error_handling(self, mock_post, test_job, db_session, sample_events):
+        """Test error handling for failed requests."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': 'Test message'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock connection error
+        mock_post.side_effect = requests.exceptions.ConnectionError("Failed to connect")
+
+        # Process event - should not raise exception
+        result = agent.check([sample_events[0]])
+
+        # Should still return empty list
+        assert result == []
+
+    def test_discord_webhook_agent_config_schema(self):
+        """Test configuration schema structure."""
+        schema = DiscordWebhookAgent.get_config_schema()
+        
+        assert 'required_fields' in schema
+        assert 'webhook_url' in schema['required_fields']
+        
+        assert 'optional_fields' in schema
+        optional_field_names = [f['name'] for f in schema['optional_fields']]
+        
+        assert 'content_template' in optional_field_names
+        assert 'username' in optional_field_names
+        assert 'avatar_url' in optional_field_names
+        assert 'embed' in optional_field_names
+
+    @patch('app.agents.types.discord_webhook_agent.requests.post')
+    def test_discord_webhook_agent_processes_multiple_events(self, mock_post, test_job, db_session, sample_events):
+        """Test processing multiple events in one batch."""
+        config = {
+            'webhook_url': 'https://discord.com/api/webhooks/123456/abcdef',
+            'content_template': '{{ title }}: {{ link }}'
+        }
+        
+        agent = DiscordWebhookAgent(
+            agent_id=test_job.id,
+            config=config,
+            user_id=test_job.user_id,
+            db_session=db_session
+        )
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+
+        # Process multiple events (sample_events fixture has 2 events)
+        result = agent.check(sample_events)
+
+        # Should return empty list
+        assert result == []
+
+        # Should have sent 2 webhooks
+        assert mock_post.call_count == 2

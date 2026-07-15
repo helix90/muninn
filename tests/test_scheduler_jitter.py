@@ -245,8 +245,6 @@ class TestSchedulerIntegration:
     @patch('app.scheduler.scheduler.scheduler')
     def test_rate_limiter_prevents_thundering_herd(self, mock_scheduler, mock_db):
         """Test that rate limiter prevents too many simultaneous starts."""
-        # Create a real rate limiter (not mocked)
-        from app.scheduler.scheduler import _rate_limiter
         limiter = JobExecutionRateLimiter(max_starts_per_second=5)
 
         # Setup mocks
@@ -264,24 +262,26 @@ class TestSchedulerIntegration:
 
         def execute_with_timing(job_id):
             """Execute job and record timing."""
-            with patch('app.scheduler.scheduler._rate_limiter', limiter):
-                with patch('app.scheduler.scheduler.time.sleep'):  # Skip jitter for this test
-                    execute_scheduled_job(job_id)
-                    with lock:
-                        execution_times.append(time.time())
+            execute_scheduled_job(job_id)
+            with lock:
+                execution_times.append(time.time())
 
-        # Launch 20 jobs simultaneously
-        threads = []
-        start_time = time.time()
+        # Apply patches at test level (not per-thread) — patch is NOT thread-safe
+        with patch('app.scheduler.scheduler._rate_limiter', limiter), \
+             patch('app.scheduler.scheduler.time.sleep'):  # Skip jitter
 
-        for i in range(20):
-            thread = threading.Thread(target=execute_with_timing, args=(i,))
-            thread.start()
-            threads.append(thread)
+            # Launch 20 jobs simultaneously
+            threads = []
+            start_time = time.time()
 
-        # Wait for all to complete
-        for thread in threads:
-            thread.join(timeout=10)
+            for i in range(20):
+                thread = threading.Thread(target=execute_with_timing, args=(i,))
+                thread.start()
+                threads.append(thread)
+
+            # Wait for all to complete
+            for thread in threads:
+                thread.join(timeout=10)
 
         total_elapsed = time.time() - start_time
 
@@ -377,7 +377,7 @@ class TestSchedulerIntegration:
             mock_app_context.__enter__.assert_called_once()
 
             # Verify database query was called
-            assert mock_db.session.query.called, "Database query should be called within app context"
+            assert mock_db.session.get.called, "Database query should be called within app context"
 
             # Verify agent was run
             scheduler.agent_service.run_agent.assert_called_once()

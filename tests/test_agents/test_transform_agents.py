@@ -5,7 +5,6 @@ Tests for transform agents (FilterAgent, DeduplicationAgent, HTMLParserAgent, Te
 import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
-from app import create_app
 from app.extensions import db
 from app.agents.types import FilterAgent, DeduplicationAgent, HTMLParserAgent, TemplateAgent
 from app.agents import agent_registry
@@ -14,43 +13,21 @@ from app.models import Event
 
 
 @pytest.fixture
-def app():
-    """Create application for testing"""
-    app = create_app('testing')
-    return app
-
-
-@pytest.fixture
-def app_context(app):
-    """Create application context and database tables"""
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.session.remove()
-        db.drop_all()
-
-
-@pytest.fixture
-def test_job(app_context):
+def test_job(app, test_user):
     """Create a test job for agent tests"""
-    from app.models import Job, User
+    from app.models import Job
 
-    # Create a test user first
-    user = User(username='testuser', email='test@example.com', password='password123')
-    db.session.add(user)
-    db.session.flush()
+    with app.app_context():
+        job = Job(
+            name='Test Agent',
+            job_type='rss_agent',
+            config={'feed_url': 'https://example.com/feed.xml'},
+            user_id=test_user.id
+        )
+        db.session.add(job)
+        db.session.commit()
 
-    # Create a test job
-    job = Job(
-        name='Test Agent',
-        job_type='rss_agent',  # Use valid agent type
-        config={'feed_url': 'https://example.com/feed.xml'},
-        user_id=user.id
-    )
-    db.session.add(job)
-    db.session.commit()
-
-    return job
+        yield job
 
 
 @pytest.fixture
@@ -742,6 +719,92 @@ class TestTemplateAgent:
 
         assert schema['agent_type'] == 'template_agent'
         assert 'jinja2_features' in schema
+
+
+class TestDatetimeformatFilter:
+    """Tests for the custom datetimeformat Jinja2 filter in TemplateAgent."""
+
+    def _agent(self, test_job, template):
+        return TemplateAgent(
+            agent_id=test_job.id,
+            config={'template': template, 'output_field': 'result', 'preserve_original': False},
+            user_id=test_job.user_id,
+        )
+
+    def _event(self, test_job, payload):
+        e = Event(
+            agent_id=test_job.id,
+            agent_type='test_agent',
+            user_id=test_job.user_id,
+            payload=payload,
+            metadata={},
+        )
+        db.session.add(e)
+        db.session.commit()
+        return e
+
+    def test_default_format(self, app, test_job):
+        """Default format produces human-readable date and time."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': '2026-07-14T09:32:00.000000'})
+            agent = self._agent(test_job, '{{ ts | datetimeformat }}')
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == 'July 14, 2026 at 9:32 AM'
+
+    def test_custom_format_date_only(self, app, test_job):
+        """Custom strftime format string is respected."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': '2026-07-14T09:32:00.000000'})
+            agent = self._agent(test_job, "{{ ts | datetimeformat('%d %b %Y') }}")
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == '14 Jul 2026'
+
+    def test_custom_format_with_weekday(self, app, test_job):
+        """Weekday name formats correctly."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': '2026-07-14T09:32:00.000000'})
+            agent = self._agent(test_job, "{{ ts | datetimeformat('%A') }}")
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == 'Tuesday'
+
+    def test_afternoon_time_pm(self, app, test_job):
+        """PM times render correctly."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': '2026-07-14T15:45:00.000000'})
+            agent = self._agent(test_job, "{{ ts | datetimeformat('%-I:%M %p') }}")
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == '3:45 PM'
+
+    def test_triggered_at_field_from_scheduler(self, app, test_job):
+        """Works with the triggered_at field that SchedulerAgent emits."""
+        with app.app_context():
+            event = self._event(test_job, {'triggered_at': '2026-01-01T00:00:00.000000'})
+            agent = self._agent(test_job, '{{ triggered_at | datetimeformat }}')
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == 'January 1, 2026 at 12:00 AM'
+
+    def test_none_value_returns_empty_string(self, app, test_job):
+        """None/missing value returns empty string rather than raising."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': None})
+            agent = self._agent(test_job, '{{ ts | datetimeformat }}')
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == ''
+
+    def test_invalid_string_returned_as_is(self, app, test_job):
+        """Non-ISO strings are passed through unchanged."""
+        with app.app_context():
+            event = self._event(test_job, {'ts': 'not-a-date'})
+            agent = self._agent(test_job, '{{ ts | datetimeformat }}')
+            result = agent.process([event])
+            db.session.commit()
+            assert result[0].payload['result'] == 'not-a-date'
 
 
 class TestAgentRegistry:

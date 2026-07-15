@@ -33,3 +33,6 @@ MAX_USERNAME_LENGTH = 80
 
 # Email
 MAX_EMAIL_LENGTH = 120
+
+# Agent failure reporting
+AGENT_FAILURE_WINDOW_DAYS = 7  # look-back window for "recent" failed run counts

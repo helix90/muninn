@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Import Scenario - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-xl mx-auto">
+
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Import Scenario</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">
+                Upload a Muninn scenario export file to recreate the scenario and its agents on this instance.
+            </p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data"
+              action="{{ url_for('scenarios.import_scenario_view') }}">
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-6">
+
+                <!-- File picker -->
+                <div>
+                    <label for="file"
+                           class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Export file <span class="text-red-500">*</span>
+                    </label>
+                    <input type="file" id="file" name="file" accept=".json" required
+                           class="block w-full text-sm text-gray-900 dark:text-gray-100
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded file:border-0
+                                  file:text-sm file:font-medium
+                                  file:bg-blue-50 dark:file:bg-blue-900
+                                  file:text-blue-700 dark:file:text-blue-300
+                                  hover:file:bg-blue-100 dark:hover:file:bg-blue-800
+                                  cursor-pointer">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        JSON files only, maximum 1 MB.
+                    </p>
+                </div>
+
+                <!-- Info note -->
+                <div class="bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-400 dark:border-amber-500 p-4 rounded">
+                    <p class="text-sm text-amber-800 dark:text-amber-200">
+                        <strong>Credentials:</strong> Agent configs that reference
+                        <code class="bg-amber-100 dark:bg-amber-800 px-1 rounded text-xs">&#123;&#123;credential:name&#125;&#125;</code>
+                        placeholders are imported as-is. Make sure matching credentials exist on
+                        this instance before running the imported agents, or the agents will fail
+                        to authenticate.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-end space-x-3 mt-6">
+                <a href="{{ url_for('scenarios.scenario_list') }}"
+                   class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500
+                          text-gray-800 dark:text-gray-200 font-bold py-2 px-6 rounded">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600
+                               text-white font-bold py-2 px-6 rounded">
+                    Import Scenario
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+{% endblock %}

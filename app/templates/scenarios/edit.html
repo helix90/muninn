@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Scenario - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-2xl">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Edit Scenario</h1>
+
+    <form method="POST" class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div class="mb-6">
+            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Name <span class="text-red-500">*</span>
+            </label>
+            <input type="text" id="name" name="name" required
+                   value="{{ scenario.name }}"
+                   maxlength="100"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., Weather Monitoring">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                A descriptive name for this scenario
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+            </label>
+            <textarea id="description" name="description" rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional description of what this scenario is for">{{ scenario.description or '' }}</textarea>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Explain what this scenario is used for
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <label for="color" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Color
+            </label>
+            <div class="flex items-center space-x-3">
+                <input type="color" id="color" name="color"
+                       value="{{ scenario.color or '#3B82F6' }}"
+                       class="h-10 w-20 border border-gray-300 dark:border-gray-600 rounded cursor-pointer">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Choose a color to identify this scenario</span>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+            <a href="{{ url_for('scenarios.scenario_list') }}"
+               class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 font-medium">
+                Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

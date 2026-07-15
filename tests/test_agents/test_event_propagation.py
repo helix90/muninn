@@ -415,3 +415,142 @@ class TestAgentService:
             # Verify deleted
             deleted_link = db.session.query(AgentLink).get(link.id)
             assert deleted_link is None
+
+
+class TestCredentialResolutionInPropagation:
+    """Ensure credentials are resolved before agents run during event propagation.
+
+    Regression tests for the bug where _execute_agent() passed raw agent config
+    (containing {{credential:name}} template strings) directly to the agent
+    constructor instead of resolving credentials first.
+    """
+
+    def test_credentials_resolved_for_downstream_agent(self, app, test_job):
+        """Action/transform agents receive resolved credential values, not template strings."""
+        with app.app_context():
+            from app.models import Job, User
+            from app.services.credential_service import CredentialService
+
+            user = db.session.query(User).first()
+
+            # Store a credential for the user
+            cred_service = CredentialService()
+            cred_service.create_credential(user.id, 'xmpp_pass', 'correct-horse-battery', 'XMPP password')
+
+            # Source agent
+            source = Job(
+                name='Source',
+                job_type='rss_agent',
+                config={'feed_url': 'https://example.com/feed.xml'},
+                user_id=user.id,
+            )
+            db.session.add(source)
+            db.session.flush()
+
+            # Downstream action agent whose config references a credential
+            action = Job(
+                name='Notifier',
+                job_type='filter_agent',
+                config={
+                    'rules': [{'field': 'title', 'type': 'contains', 'value': 'test'}],
+                    'secret': '{{credential:xmpp_pass}}',
+                },
+                user_id=user.id,
+            )
+            db.session.add(action)
+            db.session.flush()
+
+            link = AgentLink(source_agent_id=source.id, target_agent_id=action.id)
+            db.session.add(link)
+
+            event = Event(
+                agent_id=source.id,
+                agent_type='rss_agent',
+                user_id=user.id,
+                payload={'title': 'test article', 'link': 'https://example.com/1'},
+                metadata={},
+            )
+            db.session.add(event)
+            db.session.commit()
+
+            received_configs = []
+
+            original_create = __import__(
+                'app.agents.registry', fromlist=['agent_registry']
+            ).agent_registry.create_agent
+
+            def capturing_create_agent(**kwargs):
+                received_configs.append(kwargs.get('config', {}))
+                return original_create(**kwargs)
+
+            service = EventService(db.session)
+            with patch.object(
+                __import__('app.agents.registry', fromlist=['agent_registry']).agent_registry,
+                'create_agent',
+                side_effect=capturing_create_agent,
+            ):
+                service.propagate_events([event])
+
+            assert received_configs, "create_agent was never called for the downstream agent"
+            downstream_config = received_configs[-1]
+            assert downstream_config.get('secret') == 'correct-horse-battery', (
+                f"Expected resolved password but got: {downstream_config.get('secret')!r}"
+            )
+
+    def test_missing_credential_fails_gracefully(self, app, test_job):
+        """Propagation records a failed run when a referenced credential does not exist."""
+        with app.app_context():
+            from app.models import Job, User, AgentRun
+            user = db.session.query(User).first()
+
+            source = Job(
+                name='Source',
+                job_type='rss_agent',
+                config={'feed_url': 'https://example.com/feed.xml'},
+                user_id=user.id,
+            )
+            db.session.add(source)
+            db.session.flush()
+
+            action = Job(
+                name='Bad Notifier',
+                job_type='filter_agent',
+                config={
+                    'rules': [],
+                    'secret': '{{credential:does_not_exist}}',
+                },
+                user_id=user.id,
+            )
+            db.session.add(action)
+            db.session.flush()
+
+            link = AgentLink(source_agent_id=source.id, target_agent_id=action.id)
+            db.session.add(link)
+
+            event = Event(
+                agent_id=source.id,
+                agent_type='rss_agent',
+                user_id=user.id,
+                payload={'title': 'test article', 'link': 'https://example.com/1'},
+                metadata={},
+            )
+            db.session.add(event)
+            db.session.commit()
+
+            service = EventService(db.session)
+            # Should not raise — graceful failure
+            stats = service.propagate_events([event])
+
+            # Agent was attempted
+            assert action.id in stats['agent_execution_counts']
+
+            # Run record should be marked failed
+            run = (
+                db.session.query(AgentRun)
+                .filter_by(agent_id=action.id)
+                .order_by(AgentRun.started_at.desc())
+                .first()
+            )
+            assert run is not None
+            assert run.status == 'failed'
+            assert 'does_not_exist' in (run.error_message or '')

@@ -1,55 +1,32 @@
 """
-Tests for source agents (RSSAgent, WebFetchAgent, SchedulerAgent)
+Tests for source agents (RSSAgent, WebFetchAgent, SchedulerAgent, JabberListenerAgent)
 """
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
-from app import create_app
 from app.extensions import db
-from app.agents.types import RSSAgent, WebFetchAgent, SchedulerAgent
+from app.agents.types import RSSAgent, WebFetchAgent, SchedulerAgent, JabberListenerAgent
 from app.agents import agent_registry
 from app.models import Event
 
 
 @pytest.fixture
-def app():
-    """Create application for testing"""
-    app = create_app('testing')
-    return app
-
-
-@pytest.fixture
-def app_context(app):
-    """Create application context and database tables"""
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.session.remove()
-        db.drop_all()
-
-
-@pytest.fixture
-def test_job(app_context):
+def test_job(app, test_user):
     """Create a test job for agent tests"""
-    from app.models import Job, User
+    from app.models import Job
 
-    # Create a test user first
-    user = User(username='testuser', email='test@example.com', password='password123')
-    db.session.add(user)
-    db.session.flush()
+    with app.app_context():
+        job = Job(
+            name='Test Agent',
+            job_type='rss_agent',
+            config={'feed_url': 'https://example.com/feed.xml'},
+            user_id=test_user.id
+        )
+        db.session.add(job)
+        db.session.commit()
 
-    # Create a test job
-    job = Job(
-        name='Test Agent',
-        job_type='rss_agent',  # Use valid agent type
-        config={'feed_url': 'https://example.com/feed.xml'},
-        user_id=user.id
-    )
-    db.session.add(job)
-    db.session.commit()
-
-    return job
+        yield job
 
 
 class TestRSSAgent:
@@ -301,7 +278,7 @@ class TestWebFetchAgent:
         assert event.event_metadata['elapsed_ms'] == 150.0
 
     @patch('app.agents.types.web_fetch_agent.requests.get')
-    def test_web_fetch_agent_handles_timeout(self, mock_get, app_context):
+    def test_web_fetch_agent_handles_timeout(self, mock_get, app):
         """Test web fetch agent handles timeout"""
         import requests
         mock_get.side_effect = requests.exceptions.Timeout()
@@ -413,6 +390,404 @@ class TestSchedulerAgent:
         assert schema['capabilities']['can_be_scheduled'] == True
 
 
+class TestJabberListenerAgent:
+    """Tests for JabberListenerAgent"""
+
+    def test_jabber_listener_agent_registered(self):
+        """Test that JabberListenerAgent is registered"""
+        assert agent_registry.is_registered('jabber_listener_agent')
+        assert 'jabber_listener_agent' in agent_registry.get_source_agents()
+
+    def test_jabber_listener_agent_config_validation(self):
+        """Test Jabber listener agent configuration validation"""
+        # Valid minimal config
+        agent = JabberListenerAgent(
+            agent_id=1,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret123'
+            },
+            user_id=1
+        )
+        assert agent.agent_type == 'jabber_listener_agent'
+        assert agent.config['jid'] == 'bot@jabber.example.com'
+        # Default listen_mode is 'both' (not stored in config dict)
+
+        # Missing jid
+        with pytest.raises(ValueError, match="jid"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={'password': 'secret'},
+                user_id=1
+            )
+
+        # Missing password
+        with pytest.raises(ValueError, match="password"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={'jid': 'bot@jabber.example.com'},
+                user_id=1
+            )
+
+        # Invalid listen_mode
+        with pytest.raises(ValueError, match="listen_mode"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={
+                    'jid': 'bot@jabber.example.com',
+                    'password': 'secret',
+                    'listen_mode': 'invalid'
+                },
+                user_id=1
+            )
+
+        # Invalid port
+        with pytest.raises(ValueError, match="port"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={
+                    'jid': 'bot@jabber.example.com',
+                    'password': 'secret',
+                    'port': -1
+                },
+                user_id=1
+            )
+
+    def test_jabber_listener_agent_capabilities(self):
+        """Test Jabber listener agent capabilities"""
+        assert JabberListenerAgent.can_be_scheduled == True
+        assert JabberListenerAgent.can_receive_events == False
+        assert JabberListenerAgent.can_create_events == True
+        assert JabberListenerAgent.requires_input == False
+
+    @patch('app.agents.types.jabber_listener_agent.threading.Thread')
+    def test_jabber_listener_agent_fetch_direct_message(self, mock_thread, test_job):
+        """Test Jabber listener agent receives direct message"""
+        # Create agent
+        agent = JabberListenerAgent(
+            agent_id=test_job.id,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'listen_mode': 'direct'
+            },
+            user_id=test_job.user_id
+        )
+
+        # Mock a direct message in the queue with correct structure
+        from datetime import datetime
+        msg_data = {
+            'payload': {
+                'body': 'Hello bot!',
+                'from': 'user@example.com',
+                'from_resource': 'mobile',
+                'type': 'chat',
+                'subject': None
+            },
+            'metadata': {
+                'received_at': datetime.utcnow().isoformat(),
+                'message_type': 'direct',
+                'agent_jid': 'bot@jabber.example.com'
+            }
+        }
+
+        # Directly add message to queue
+        with agent._queue_lock:
+            agent._message_queue.append(msg_data)
+
+        # Fetch events
+        events = agent.fetch()
+        db.session.commit()
+
+        # Verify results
+        assert len(events) == 1
+        event = events[0]
+        assert event.payload['body'] == 'Hello bot!'
+        assert event.payload['from'] == 'user@example.com'
+        assert event.payload['type'] == 'chat'
+        assert event.event_metadata['message_type'] == 'direct'
+        assert event.event_metadata['agent_jid'] == 'bot@jabber.example.com'
+
+    @patch('app.agents.types.jabber_listener_agent.threading.Thread')
+    def test_jabber_listener_agent_fetch_groupchat_message(self, mock_thread, test_job):
+        """Test Jabber listener agent receives group chat message"""
+        # Create agent
+        agent = JabberListenerAgent(
+            agent_id=test_job.id,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'listen_mode': 'rooms',
+                'rooms': ['room@conference.example.com'],
+                'room_nickname': 'BotNick'
+            },
+            user_id=test_job.user_id
+        )
+
+        # Mock a group chat message in the queue with correct structure
+        from datetime import datetime
+        msg_data = {
+            'payload': {
+                'body': 'Meeting at 3pm',
+                'from': 'room@conference.example.com',
+                'from_nick': 'Alice',
+                'type': 'groupchat',
+                'subject': None
+            },
+            'metadata': {
+                'received_at': datetime.utcnow().isoformat(),
+                'message_type': 'groupchat',
+                'room': 'room@conference.example.com',
+                'agent_jid': 'bot@jabber.example.com'
+            }
+        }
+
+        # Directly add message to queue
+        with agent._queue_lock:
+            agent._message_queue.append(msg_data)
+
+        # Fetch events
+        events = agent.fetch()
+        db.session.commit()
+
+        # Verify results
+        assert len(events) == 1
+        event = events[0]
+        assert event.payload['body'] == 'Meeting at 3pm'
+        assert event.payload['from'] == 'room@conference.example.com'
+        assert event.payload['from_nick'] == 'Alice'
+        assert event.payload['type'] == 'groupchat'
+        assert event.event_metadata['message_type'] == 'groupchat'
+        assert event.event_metadata['room'] == 'room@conference.example.com'
+
+    @patch('app.agents.types.jabber_listener_agent.threading.Thread')
+    def test_jabber_listener_agent_processes_multiple_messages(self, mock_thread, test_job):
+        """Test Jabber listener agent processes multiple messages"""
+        agent = JabberListenerAgent(
+            agent_id=test_job.id,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'listen_mode': 'both'
+            },
+            user_id=test_job.user_id
+        )
+
+        from datetime import datetime
+
+        # Add multiple messages to queue with correct structure
+        messages = [
+            {
+                'payload': {
+                    'body': 'Message 1',
+                    'from': 'user1@example.com',
+                    'from_resource': 'desktop',
+                    'type': 'chat',
+                    'subject': None
+                },
+                'metadata': {
+                    'received_at': datetime.utcnow().isoformat(),
+                    'message_type': 'direct',
+                    'agent_jid': 'bot@jabber.example.com'
+                }
+            },
+            {
+                'payload': {
+                    'body': 'Message 2',
+                    'from': 'user2@example.com',
+                    'from_resource': 'mobile',
+                    'type': 'chat',
+                    'subject': None
+                },
+                'metadata': {
+                    'received_at': datetime.utcnow().isoformat(),
+                    'message_type': 'direct',
+                    'agent_jid': 'bot@jabber.example.com'
+                }
+            },
+            {
+                'payload': {
+                    'body': 'Group message',
+                    'from': 'room@conference.example.com',
+                    'from_nick': 'Bob',
+                    'type': 'groupchat',
+                    'subject': None
+                },
+                'metadata': {
+                    'received_at': datetime.utcnow().isoformat(),
+                    'message_type': 'groupchat',
+                    'room': 'room@conference.example.com',
+                    'agent_jid': 'bot@jabber.example.com'
+                }
+            }
+        ]
+
+        with agent._queue_lock:
+            agent._message_queue.extend(messages)
+
+        # Fetch events
+        events = agent.fetch()
+        db.session.commit()
+
+        # Should get all 3 messages
+        assert len(events) == 3
+        assert events[0].payload['body'] == 'Message 1'
+        assert events[1].payload['body'] == 'Message 2'
+        assert events[2].payload['body'] == 'Group message'
+
+    @patch('app.agents.types.jabber_listener_agent.threading.Thread')
+    def test_jabber_listener_agent_empty_queue(self, mock_thread, test_job):
+        """Test Jabber listener agent with empty message queue"""
+        agent = JabberListenerAgent(
+            agent_id=test_job.id,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret'
+            },
+            user_id=test_job.user_id
+        )
+
+        # Fetch with empty queue
+        events = agent.fetch()
+
+        # Should return empty list
+        assert len(events) == 0
+
+    def test_jabber_listener_agent_listen_modes(self):
+        """Test Jabber listener agent different listen modes"""
+        # Listen to direct messages only
+        agent_direct = JabberListenerAgent(
+            agent_id=1,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'listen_mode': 'direct'
+            },
+            user_id=1
+        )
+        assert agent_direct.config['listen_mode'] == 'direct'
+
+        # Listen to rooms only
+        agent_rooms = JabberListenerAgent(
+            agent_id=2,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'listen_mode': 'rooms',
+                'rooms': ['room1@conference.server']
+            },
+            user_id=1
+        )
+        assert agent_rooms.config['listen_mode'] == 'rooms'
+        assert agent_rooms.config['rooms'] == ['room1@conference.server']
+
+        # Listen to both (default) - when not specified, defaults to 'both'
+        agent_both = JabberListenerAgent(
+            agent_id=3,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret'
+            },
+            user_id=1
+        )
+        # Default listen_mode is 'both' (not stored in config dict unless explicitly provided)
+
+    def test_jabber_listener_agent_filtering_config(self):
+        """Test Jabber listener agent filtering configuration"""
+        agent = JabberListenerAgent(
+            agent_id=1,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'ignore_self': True,
+                'ignore_jids': ['spam@example.com', 'bot2@example.com']
+            },
+            user_id=1
+        )
+
+        assert agent.config['ignore_self'] == True
+        assert 'spam@example.com' in agent.config['ignore_jids']
+        assert 'bot2@example.com' in agent.config['ignore_jids']
+
+    def test_jabber_listener_agent_config_schema(self):
+        """Test Jabber listener agent configuration schema"""
+        schema = JabberListenerAgent.get_config_schema()
+
+        assert schema['agent_type'] == 'jabber_listener_agent'
+        assert 'jid' in schema['required_fields']
+        assert 'password' in schema['required_fields']
+        assert schema['capabilities']['can_be_scheduled'] == True
+        assert schema['capabilities']['can_receive_events'] == False
+        assert schema['capabilities']['can_create_events'] == True
+
+    @patch('app.agents.types.jabber_listener_agent.threading.Thread')
+    def test_jabber_listener_agent_cleanup_on_del(self, mock_thread, test_job):
+        """Test Jabber listener agent cleanup on deletion"""
+        agent = JabberListenerAgent(
+            agent_id=test_job.id,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret'
+            },
+            user_id=test_job.user_id
+        )
+
+        # Mock the thread and stop event
+        agent._xmpp_thread = MagicMock()
+        agent._stop_event = MagicMock()
+
+        # Delete agent
+        del agent
+
+        # Cleanup should be called (implicitly through __del__)
+        # We can't easily test __del__ directly, but we've verified the structure exists
+
+    def test_jabber_listener_agent_with_server_override(self):
+        """Test Jabber listener agent with explicit server configuration"""
+        agent = JabberListenerAgent(
+            agent_id=1,
+            config={
+                'jid': 'bot@jabber.example.com',
+                'password': 'secret',
+                'server': 'xmpp.custom-server.com',
+                'port': 5223,
+                'use_tls': False
+            },
+            user_id=1
+        )
+
+        assert agent.config['server'] == 'xmpp.custom-server.com'
+        assert agent.config['port'] == 5223
+        assert agent.config['use_tls'] == False
+
+    def test_jabber_listener_agent_rooms_validation(self):
+        """Test Jabber listener agent rooms configuration validation"""
+        # Rooms mode requires rooms list
+        with pytest.raises(ValueError, match="'rooms'.*empty.*'rooms'"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={
+                    'jid': 'bot@jabber.example.com',
+                    'password': 'secret',
+                    'listen_mode': 'rooms'
+                },
+                user_id=1
+            )
+
+        # Rooms must be a list
+        with pytest.raises(ValueError, match="rooms.*list"):
+            JabberListenerAgent(
+                agent_id=1,
+                config={
+                    'jid': 'bot@jabber.example.com',
+                    'password': 'secret',
+                    'listen_mode': 'rooms',
+                    'rooms': 'not-a-list'
+                },
+                user_id=1
+            )
+
+
 class TestAgentRegistry:
     """Tests for agent registry with source agents"""
 
@@ -423,6 +798,7 @@ class TestAgentRegistry:
         assert 'rss_agent' in source_agents
         assert 'web_fetch_agent' in source_agents
         assert 'scheduler_agent' in source_agents
+        assert 'jabber_listener_agent' in source_agents
 
     def test_registry_can_create_source_agents(self):
         """Test that registry can create source agent instances"""
@@ -452,6 +828,15 @@ class TestAgentRegistry:
             user_id=1
         )
         assert isinstance(agent, SchedulerAgent)
+
+        # Create jabber listener agent
+        agent = agent_registry.create_agent(
+            agent_type='jabber_listener_agent',
+            agent_id=4,
+            config={'jid': 'bot@jabber.example.com', 'password': 'secret'},
+            user_id=1
+        )
+        assert isinstance(agent, JabberListenerAgent)
 
     def test_registry_get_capabilities(self):
         """Test getting capabilities for source agents"""

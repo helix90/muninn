@@ -42,11 +42,21 @@
                             {% endif %}
                         </div>
 
-                        <div class="mb-6 flex items-center">
-                            {{ form.remember_me(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded") }}
-                            <label for="remember_me" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                                Remember Me
-                            </label>
+                        <div class="mb-6 flex items-center justify-between">
+                            <div class="flex items-center">
+                                {{ form.remember_me(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded") }}
+                                <label for="remember_me" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                    Remember Me
+                                </label>
+                            </div>
+                            <div class="flex gap-3 text-sm">
+                                <a href="{{ url_for('auth.forgot_username') }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                                    Forgot username?
+                                </a>
+                                <a href="{{ url_for('auth.forgot_password') }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                                    Forgot password?
+                                </a>
+                            </div>
                         </div>
 
                         <div class="flex justify-end">

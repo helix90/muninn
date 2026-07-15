@@ -68,7 +68,10 @@
             <div class="text-2xl font-bold text-blue-600 dark:text-blue-500">{{ stats.total_events_created }}</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Failed Runs</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Failed Runs
+                <span class="text-xs font-normal">(last {{ stats.failure_window_days }}d)</span>
+            </div>
             <div class="text-2xl font-bold text-red-600 dark:text-red-500">{{ stats.failed_runs }}</div>
         </div>
     </div>
@@ -330,7 +333,7 @@
                     </button>
                 </div>
                 <div id="payload-{{ event.id }}" class="hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <pre class="text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto">{{ event.payload|tojson(indent=2) }}</pre>
+                    <pre class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto">{{ event.payload|tojson(indent=2) }}</pre>
                 </div>
             </div>
             {% endfor %}

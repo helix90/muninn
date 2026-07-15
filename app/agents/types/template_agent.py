@@ -5,11 +5,33 @@ Single responsibility: ONLY transforms event data using Jinja2 templates.
 Does NOT fetch or filter data.
 """
 
+from datetime import datetime
 from typing import List, Dict, Any
 from jinja2 import Template, TemplateSyntaxError, UndefinedError, Environment
 from app.agents.base import TransformAgent
 from app.agents.registry import register_agent
 from app.models import Event
+
+
+def _datetimeformat(value, fmt='%B %-d, %Y at %-I:%M %p'):
+    """Jinja2 filter: parse an ISO datetime string and format it."""
+    if not value:
+        return ''
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return value
+    if isinstance(value, datetime):
+        return value.strftime(fmt)
+    return value
+
+
+def _make_jinja2_env() -> Environment:
+    """Return a Jinja2 Environment pre-loaded with all custom filters."""
+    env = Environment(finalize=lambda x: x if x is not None else '')
+    env.filters['datetimeformat'] = _datetimeformat
+    return env
 
 
 @register_agent
@@ -53,7 +75,7 @@ class TemplateAgent(TransformAgent):
 
             # Test template syntax
             try:
-                Template(self.config['template'])
+                _make_jinja2_env().parse(self.config['template'])
             except TemplateSyntaxError as e:
                 raise ValueError(f"Invalid Jinja2 template syntax: {e}")
 
@@ -71,7 +93,7 @@ class TemplateAgent(TransformAgent):
                     raise ValueError(f"Template for '{field_name}' must be a string")
 
                 try:
-                    Template(template_str)
+                    _make_jinja2_env().parse(template_str)
                 except TemplateSyntaxError as e:
                     raise ValueError(f"Invalid Jinja2 syntax in template '{field_name}': {e}")
 
@@ -175,7 +197,7 @@ class TemplateAgent(TransformAgent):
             # Create environment with proper finalize function
             # This prevents None from being converted to 'None' string,
             # allowing default() filter to work correctly
-            env = Environment(finalize=lambda x: x if x is not None else '')
+            env = _make_jinja2_env()
             template = env.from_string(template_str)
             return template.render(**data)
         except UndefinedError as e:
@@ -194,7 +216,7 @@ class TemplateAgent(TransformAgent):
         schema['optional_fields'] = [
             {
                 'name': 'template',
-                'type': 'string',
+                'type': 'textarea',
                 'description': 'Single Jinja2 template string (alternative to templates dict)'
             },
             {

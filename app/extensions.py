@@ -75,10 +75,23 @@ def init_extensions(app):
         raise
 
     try:
-        # Initialize scheduler
+        # Initialize scheduler — but only in the main process, not in the
+        # Werkzeug reloader's monitor process (which also imports the app).
+        # Without this guard, `flask run` spawns two APScheduler instances
+        # that share the same database jobstore and fire every job twice.
+        import os
         from app.scheduler import scheduler
-        scheduler.init_app(app)
-        app.logger.info("Scheduler initialized successfully")
+        # In debug mode the Werkzeug reloader spawns a monitor process AND a
+        # worker process. Both import the app, so without this guard two
+        # APScheduler instances start and every job fires twice.
+        # WERKZEUG_RUN_MAIN is 'true' only in the worker; it is unset in the
+        # monitor. In production (no reloader) it is also unset, so we check
+        # app.debug to distinguish the two cases.
+        if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            scheduler.init_app(app)
+            app.logger.info("Scheduler initialized successfully")
+        else:
+            app.logger.info("Scheduler skipped (Werkzeug reloader monitor process)")
     except Exception as e:
         app.logger.error(f"Failed to initialize scheduler: {e}")
         raise

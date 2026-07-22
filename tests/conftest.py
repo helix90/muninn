@@ -3,8 +3,10 @@ Pytest configuration and fixtures for Muninn testing
 """
 
 import pytest
+from unittest.mock import patch
 from sqlalchemy import text
 from flask import g
+from werkzeug.security import generate_password_hash as _werkzeug_hash
 from app import create_app
 from app.extensions import db
 
@@ -69,6 +71,15 @@ def _truncate_all_tables():
             """))
     except Exception as e:
         print(f"Warning: Error clearing tables: {e}")
+
+
+@pytest.fixture(scope='session', autouse=True)
+def fast_password_hashing():
+    """Replace scrypt with a single-iteration pbkdf2 during tests (2000x faster)."""
+    def _fast_hash(password, **kwargs):
+        return _werkzeug_hash(password, method='pbkdf2:sha256:1')
+    with patch('app.models.generate_password_hash', _fast_hash):
+        yield
 
 
 @pytest.fixture(scope='session')

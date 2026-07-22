@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Runs - Muninn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Pipeline Runs</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Each row is a distinct end-to-end propagation through your agent graph.
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        {% if runs %}
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Propagation ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Started</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Agent Runs</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Detail</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for run in runs %}
+                {% set duration_s = ((run.completed_at - run.started_at).total_seconds() | round(1)) if run.completed_at and run.started_at else None %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="{{ url_for('pipeline_runs.run_detail', propagation_id=run.propagation_id) }}"
+                           class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ run.propagation_id }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') if run.started_at else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {{ duration_s ~ 's' if duration_s is not none else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {{ run.agent_run_count }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <a href="{{ url_for('pipeline_runs.run_detail', propagation_id=run.propagation_id) }}"
+                           class="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                            View trace &rarr;
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="mt-4 text-gray-500 dark:text-gray-400">No pipeline runs yet.</p>
+            <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
+                Runs appear here once agents propagate events through linked pipelines.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

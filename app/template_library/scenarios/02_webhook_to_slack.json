@@ -1,0 +1,40 @@
+{
+  "_template_meta": {
+    "display_name": "Webhook to Slack Notification",
+    "description": "Receive an inbound webhook payload and forward a formatted notification to a Slack channel. Useful for CI/CD alerts, form submissions, or any HTTP event.",
+    "tags": ["webhook", "slack", "notifications"],
+    "difficulty": "beginner",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Webhook to Slack Notification",
+    "description": "Forward webhook events to Slack as formatted messages."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Webhook Receiver",
+      "job_type": "webhook_agent",
+      "config": {},
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Slack Notifier",
+      "job_type": "slack_agent",
+      "config": {
+        "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "message": "*New event received*\n{{payload | tojson(indent=2)}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1}
+  ]
+}

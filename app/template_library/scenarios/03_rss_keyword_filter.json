@@ -1,0 +1,71 @@
+{
+  "_template_meta": {
+    "display_name": "RSS Keyword Filter",
+    "description": "Fetch an RSS feed, keep only articles matching a keyword, deduplicate, then email matches. Great for monitoring news or job postings for specific topics.",
+    "tags": ["rss", "filter", "email", "monitoring"],
+    "difficulty": "beginner",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "RSS Keyword Filter",
+    "description": "Monitor an RSS feed for keyword matches and email them."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "RSS Fetcher",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.feedburner.com/example",
+        "max_items": 20
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Keyword Filter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {"field": "title", "type": "contains", "value": "python"}
+        ]
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Deduplicator",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": ["link"],
+        "window_duration_seconds": 86400
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Email Alert",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "you@example.com",
+        "subject": "Keyword match: {{payload.title}}",
+        "body": "{{payload.title}}\n\n{{payload.link}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2},
+    {"source": 2, "target": 3}
+  ]
+}

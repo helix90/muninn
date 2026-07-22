@@ -1,0 +1,57 @@
+{
+  "_template_meta": {
+    "display_name": "RSS to Email Digest",
+    "description": "Fetch articles from an RSS feed and send a daily email digest. New items are deduplicated so you only get each article once.",
+    "tags": ["rss", "email", "digest"],
+    "difficulty": "beginner",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "RSS to Email Digest",
+    "description": "Fetch articles from an RSS feed and email them as a digest."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "RSS Fetcher",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.feedburner.com/example",
+        "max_items": 10
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Deduplicator",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": ["link"],
+        "window_duration_seconds": 86400
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Email Sender",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "you@example.com",
+        "subject": "Daily RSS Digest: {{payload.title}}",
+        "body": "{{payload.title}}\n\n{{payload.link}}\n\n{{payload.summary}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2}
+  ]
+}

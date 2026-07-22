@@ -118,6 +118,14 @@
                             <span id="health-badge" class="hidden ml-1.5 px-1.5 py-0.5 text-xs font-bold bg-red-600 text-white rounded-full">!</span>
                             {% endif %}
                         </a>
+                        <a href="{{ url_for('template_library.gallery') }}"
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Templates
+                        </a>
+                        <a href="{{ url_for('pipeline_runs.list_runs') }}"
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Runs
+                        </a>
                     </div>
                 </div>
                 
@@ -148,6 +156,10 @@
                         <a href="{{ url_for('auth.settings') }}"
                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
                             Settings
+                        </a>
+                        <a href="{{ url_for('api.manage_tokens') }}"
+                           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">
+                            API Tokens
                         </a>
                         <a href="{{ url_for('auth.logout') }}"
                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">

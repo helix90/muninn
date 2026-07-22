@@ -1,0 +1,59 @@
+{
+  "_template_meta": {
+    "display_name": "API Endpoint Monitor",
+    "description": "Poll an HTTP endpoint on a schedule, filter the response, and send an email alert when a condition is met. Useful for checking status pages, price feeds, or JSON APIs.",
+    "tags": ["api", "monitoring", "email", "http"],
+    "difficulty": "intermediate",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "API Endpoint Monitor",
+    "description": "Poll an API and email results when data matches a condition."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "API Poller",
+      "job_type": "api_call_agent",
+      "config": {
+        "url": "https://api.example.com/status",
+        "method": "GET",
+        "headers": {}
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Response Filter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {"field": "status", "type": "equals", "value": "degraded"}
+        ]
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Email Alert",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "you@example.com",
+        "subject": "API Alert: status={{payload.status}}",
+        "body": "The monitored API returned status: {{payload.status}}\n\nFull response:\n{{payload | tojson(indent=2)}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2}
+  ]
+}

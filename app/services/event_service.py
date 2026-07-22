@@ -8,6 +8,7 @@ Events flow from source agents → transform agents → action agents.
 from typing import List, Dict, Any, Set, Optional
 from datetime import datetime
 import logging
+import uuid
 from sqlalchemy import cast, String
 from app.models import Event, AgentLink
 from app.extensions import db
@@ -60,16 +61,28 @@ class EventService:
                 'agents_executed': 0,
                 'events_created': 0,
                 'max_depth_reached': False,
-                'agent_execution_counts': {}
+                'agent_execution_counts': {},
+                'propagation_id': None,
             }
 
-        # Statistics tracking
+        propagation_id = str(uuid.uuid4())
+
+        # Stamp the source events so they belong to this propagation trace
+        for event in events:
+            if event.propagation_id is None:
+                event.propagation_id = propagation_id
+        try:
+            self.db_session.flush()
+        except Exception:
+            pass
+
         stats = {
             'events_propagated': 0,
             'agents_executed': 0,
             'events_created': 0,
             'max_depth_reached': False,
-            'agent_execution_counts': {}  # agent_id -> execution_count
+            'agent_execution_counts': {},
+            'propagation_id': propagation_id,
         }
 
         # Start propagation from depth 0
@@ -77,7 +90,8 @@ class EventService:
             events=events,
             depth=0,
             stats=stats,
-            visited_agent_ids=set()
+            visited_agent_ids=set(),
+            propagation_id=propagation_id,
         )
 
         return stats
@@ -87,7 +101,8 @@ class EventService:
         events: List[Event],
         depth: int,
         stats: Dict[str, Any],
-        visited_agent_ids: Set[int]
+        visited_agent_ids: Set[int],
+        propagation_id: Optional[str] = None,
     ) -> None:
         """
         Recursively propagate events through agent network.
@@ -138,7 +153,9 @@ class EventService:
 
                 # Execute the agent
                 try:
-                    new_events = self._execute_agent(target_agent, agent_events)
+                    new_events = self._execute_agent(
+                        target_agent, agent_events, propagation_id=propagation_id
+                    )
 
                     # Update statistics
                     stats['agents_executed'] += 1
@@ -151,13 +168,14 @@ class EventService:
 
                         # Recursively propagate new events
                         new_visited = visited_agent_ids.copy()
-                        new_visited.add(target_agent_id)  # Add the target agent we just executed
+                        new_visited.add(target_agent_id)
 
                         self._propagate_recursive(
                             events=new_events,
                             depth=depth + 1,
                             stats=stats,
-                            visited_agent_ids=new_visited
+                            visited_agent_ids=new_visited,
+                            propagation_id=propagation_id,
                         )
 
                 except Exception as e:
@@ -199,7 +217,8 @@ class EventService:
 
         return agents
 
-    def _execute_agent(self, agent_model, events: List[Event]) -> List[Event]:
+    def _execute_agent(self, agent_model, events: List[Event],
+                       propagation_id: Optional[str] = None) -> List[Event]:
         """
         Execute an agent with incoming events.
 
@@ -228,8 +247,9 @@ class EventService:
             agent_id=agent_model.id,
             status='running',
             started_at=datetime.utcnow(),
-            manual=False,  # Triggered by event propagation
-            input_event_ids=[e.id for e in events]
+            manual=False,
+            input_event_ids=[e.id for e in events],
+            propagation_id=propagation_id,
         )
         self.db_session.add(agent_run)
         self.db_session.flush()  # Get the agent_run.id
@@ -275,11 +295,10 @@ class EventService:
             # and persist new events to database
             if new_events:
                 for event in new_events:
-                    # Update the agent_id to the current agent
                     event.agent_id = agent_model.id
                     event.agent_type = agent_model.job_type
-
-                    # Add to session (will update if exists, insert if new)
+                    if propagation_id is not None:
+                        event.propagation_id = propagation_id
                     self.db_session.add(event)
                 self.db_session.flush()  # Get event IDs
 

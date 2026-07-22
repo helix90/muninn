@@ -44,6 +44,7 @@ def _truncate_all_tables():
             conn.execute(text("""
                 DELETE FROM alert_logs;
                 DELETE FROM delayed_events;
+                DELETE FROM api_tokens;
                 DELETE FROM data_store;
                 DELETE FROM agent_links;
                 DELETE FROM agent_memory;
@@ -57,6 +58,7 @@ def _truncate_all_tables():
                 DELETE FROM users;
                 ALTER SEQUENCE alert_logs_id_seq RESTART WITH 1;
                 ALTER SEQUENCE delayed_events_id_seq RESTART WITH 1;
+                ALTER SEQUENCE api_tokens_id_seq RESTART WITH 1;
                 ALTER SEQUENCE data_store_id_seq RESTART WITH 1;
                 ALTER SEQUENCE agent_links_id_seq RESTART WITH 1;
                 ALTER SEQUENCE agent_memory_id_seq RESTART WITH 1;

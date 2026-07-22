@@ -1,0 +1,82 @@
+{
+  "_template_meta": {
+    "display_name": "Content Router (Priority Triage)",
+    "description": "Receive webhook events and route them by priority: urgent items go directly to email, non-urgent items are delayed 30 minutes then forwarded to Slack. Demonstrates the Router and Delay agents.",
+    "tags": ["webhook", "router", "delay", "slack", "email", "triage"],
+    "difficulty": "advanced",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Content Router (Priority Triage)",
+    "description": "Route incoming events to email (urgent) or Slack (delayed) based on a priority field."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Webhook Receiver",
+      "job_type": "webhook_agent",
+      "config": {},
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Priority Router",
+      "job_type": "router_agent",
+      "config": {
+        "rules": [
+          {"field": "priority", "operator": "equals", "value": "urgent", "route": "urgent"},
+          {"field": "priority", "operator": "exists", "route": "normal"}
+        ],
+        "default_route": "normal"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Urgent Email",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "oncall@example.com",
+        "subject": "URGENT: {{payload.title}}",
+        "body": "Priority alert:\n\n{{payload | tojson(indent=2)}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Delay 30 min",
+      "job_type": "delay_agent",
+      "config": {
+        "delay_minutes": 30
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Slack Normal",
+      "job_type": "slack_agent",
+      "config": {
+        "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "message": "*{{payload.title}}*\n{{payload.link}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2},
+    {"source": 1, "target": 3},
+    {"source": 3, "target": 4}
+  ]
+}

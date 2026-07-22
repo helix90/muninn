@@ -1,0 +1,62 @@
+{
+  "_template_meta": {
+    "display_name": "Email-to-Telegram Forwarder",
+    "description": "Poll an IMAP mailbox for unread messages matching a subject filter and forward them as Telegram messages. Great for relaying transactional alerts to your phone.",
+    "tags": ["imap", "email", "telegram", "forwarding"],
+    "difficulty": "advanced",
+    "required_credentials": ["imap_password", "telegram_bot_token"]
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Email-to-Telegram Forwarder",
+    "description": "Forward filtered IMAP emails to Telegram."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "IMAP Watcher",
+      "job_type": "imap_agent",
+      "config": {
+        "host": "imap.example.com",
+        "port": 993,
+        "username": "you@example.com",
+        "password": "{{credential:imap_password}}",
+        "folder": "INBOX",
+        "subject_filter": "Alert:"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Subject Filter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {"field": "subject", "type": "contains", "value": "Alert:"}
+        ]
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Telegram Notify",
+      "job_type": "telegram_agent",
+      "config": {
+        "bot_token": "{{credential:telegram_bot_token}}",
+        "chat_id": "YOUR_CHAT_ID",
+        "message": "*{{payload.subject}}*\n\n{{payload.body}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2}
+  ]
+}

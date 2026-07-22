@@ -72,6 +72,9 @@ def create_app(config_name=None):
     from app.scenarios import scenarios_bp as scenarios_blueprint
     from app.webhooks import webhook_bp as webhooks_blueprint
     from app.health import health_bp as health_blueprint
+    from app.template_library import template_library_bp
+    from app.api import api_bp
+    from app.pipeline_runs import pipeline_runs_bp
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
@@ -82,6 +85,9 @@ def create_app(config_name=None):
     app.register_blueprint(scenarios_blueprint)
     app.register_blueprint(webhooks_blueprint)
     app.register_blueprint(health_blueprint)
+    app.register_blueprint(template_library_bp)
+    app.register_blueprint(api_bp)
+    app.register_blueprint(pipeline_runs_bp)
     
     # Register CLI commands
     from app.cli import register_commands

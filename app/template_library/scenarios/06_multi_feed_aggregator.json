@@ -1,0 +1,83 @@
+{
+  "_template_meta": {
+    "display_name": "Multi-Feed Aggregator",
+    "description": "Pull from three RSS feeds, route all items through a single deduplication agent, then email a digest. Demonstrates fan-in routing from multiple sources.",
+    "tags": ["rss", "aggregation", "email", "digest", "fan-in"],
+    "difficulty": "intermediate",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Multi-Feed Aggregator",
+    "description": "Aggregate multiple RSS feeds into a single deduplicated email digest."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Feed A",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.feedburner.com/feed-a",
+        "max_items": 10
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Feed B",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.feedburner.com/feed-b",
+        "max_items": 10
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Feed C",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.feedburner.com/feed-c",
+        "max_items": 10
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Deduplicator",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": ["link"],
+        "window_duration_seconds": 86400
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Email Digest",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "you@example.com",
+        "subject": "Multi-feed digest: {{payload.title}}",
+        "body": "{{payload.title}}\n\n{{payload.link}}\n\n{{payload.summary}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 3},
+    {"source": 1, "target": 3},
+    {"source": 2, "target": 3},
+    {"source": 3, "target": 4}
+  ]
+}

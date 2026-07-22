@@ -1,0 +1,70 @@
+{
+  "_template_meta": {
+    "display_name": "Web Scrape to Data Store",
+    "description": "Fetch a web page, transform the response, and store the result in the key-value DataStore while also emailing a summary. Useful for tracking prices or page content.",
+    "tags": ["web", "scraping", "datastore", "email"],
+    "difficulty": "intermediate",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Web Scrape to Data Store",
+    "description": "Fetch a web page, store extracted data, and email a summary."
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Web Fetcher",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://example.com",
+        "extract_text": true
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Data Transformer",
+      "job_type": "template_agent",
+      "config": {
+        "template": "{\"page_title\": \"{{payload.title}}\", \"fetched_at\": \"{{payload.fetched_at}}\"}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Store Result",
+      "job_type": "datastore_write_agent",
+      "config": {
+        "namespace": "scrape_results",
+        "key_template": "{{payload.page_title}}",
+        "value_template": "{{payload.fetched_at}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Email Summary",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "you@example.com",
+        "subject": "Scrape complete: {{payload.page_title}}",
+        "body": "Page title: {{payload.page_title}}\nFetched at: {{payload.fetched_at}}"
+      },
+      "is_active": true,
+      "schedule_enabled": false,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2},
+    {"source": 1, "target": 3}
+  ]
+}

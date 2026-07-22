@@ -3,6 +3,7 @@ Database models for Muninn automation platform
 """
 
 from datetime import datetime, timedelta
+import hashlib
 import secrets
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime,
@@ -371,6 +372,7 @@ class AgentRun(db.Model):
     manual = Column(Boolean, default=False, nullable=False)
     input_event_ids = Column(JSON, nullable=True, default=list)
     output_event_ids = Column(JSON, nullable=True, default=list)
+    propagation_id = Column(String(36), nullable=True, index=True)
 
     # Relationships
     agent = relationship('Job', foreign_keys=[agent_id], back_populates='agent_runs')
@@ -383,6 +385,7 @@ class AgentRun(db.Model):
         ),
         Index('idx_agent_runs_agent_status', 'agent_id', 'status'),
         Index('idx_agent_runs_started_at', 'started_at'),
+        Index('idx_agent_runs_propagation_id', 'propagation_id'),
     )
 
     def __repr__(self):
@@ -444,6 +447,7 @@ class Event(db.Model):
     event_metadata = Column('metadata', JSON, nullable=False, default=dict)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     expires_at = Column(DateTime, nullable=True)
+    propagation_id = Column(String(36), nullable=True, index=True)
 
     # Relationships
     user = relationship('User')
@@ -455,15 +459,18 @@ class Event(db.Model):
         Index('idx_events_user_created', 'user_id', 'created_at'),
         Index('idx_events_type_created', 'agent_type', 'created_at'),
         Index('idx_events_expires', 'expires_at'),
+        Index('idx_events_propagation_id', 'propagation_id'),
     )
 
-    def __init__(self, agent_id, agent_type, user_id, payload, metadata=None, expires_at=None):
+    def __init__(self, agent_id, agent_type, user_id, payload, metadata=None, expires_at=None,
+                 propagation_id=None):
         self.agent_id = agent_id
         self.agent_type = agent_type
         self.user_id = user_id
         self.payload = payload or {}
         self.event_metadata = metadata or {}
         self.expires_at = expires_at
+        self.propagation_id = propagation_id
 
     @validates('payload', 'event_metadata')
     def validate_json_data(self, key, data):
@@ -708,3 +715,50 @@ class DelayedEvent(db.Model):
         Index('idx_delayed_events_release', 'agent_id', 'release_at'),
         Index('idx_delayed_events_pending', 'released', 'release_at'),
     )
+
+
+class ApiToken(db.Model):
+    """API token for programmatic access to the REST API.
+
+    The raw token is shown to the user once on creation; only its SHA-256
+    hash is persisted so the database never holds a usable secret.
+    """
+
+    __tablename__ = 'api_tokens'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    name = Column(String(100), nullable=False)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    user = relationship('User', backref='api_tokens')
+
+    __table_args__ = (
+        Index('idx_api_tokens_user', 'user_id', 'is_active'),
+        Index('idx_api_tokens_hash', 'token_hash'),
+    )
+
+    @staticmethod
+    def generate() -> str:
+        """Return a new random 40-char hex token (caller must store the hash)."""
+        return secrets.token_hex(20)
+
+    @staticmethod
+    def hash_token(raw_token: str) -> str:
+        return hashlib.sha256(raw_token.encode()).hexdigest()
+
+    @classmethod
+    def verify(cls, raw_token: str):
+        """Return the active ApiToken for *raw_token*, or None."""
+        h = cls.hash_token(raw_token)
+        return cls.query.filter_by(token_hash=h, is_active=True).first()
+
+    def touch(self):
+        """Update last_used_at to now."""
+        self.last_used_at = datetime.utcnow()
+
+    def __repr__(self):
+        return f'<ApiToken {self.name} user={self.user_id}>'

@@ -287,6 +287,12 @@ def edit_agent(agent_id):
             # Update is_active status
             agent.is_active = request.form.get('is_active') == '1'
 
+            # Update health / alert settings
+            agent.alert_enabled = request.form.get('alert_enabled') == '1'
+            agent.alert_email = request.form.get('alert_email', '').strip() or None
+            erp_raw = request.form.get('expected_receive_period_in_days', '').strip()
+            agent.expected_receive_period_in_days = int(erp_raw) if erp_raw.isdigit() and int(erp_raw) > 0 else None
+
             db.session.commit()
 
             # Update scheduler

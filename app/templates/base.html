@@ -111,6 +111,13 @@
                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Scheduler
                         </a>
+                        <a href="{{ url_for('health.dashboard') }}"
+                           class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Health
+                            {% if current_user.is_authenticated %}
+                            <span id="health-badge" class="hidden ml-1.5 px-1.5 py-0.5 text-xs font-bold bg-red-600 text-white rounded-full">!</span>
+                            {% endif %}
+                        </a>
                     </div>
                 </div>
                 
@@ -301,6 +308,25 @@
             }
         })();
     </script>
+
+    <!-- Health badge loader -->
+    {% if current_user.is_authenticated %}
+    <script>
+        (function() {
+            const badge = document.getElementById('health-badge');
+            if (!badge) return;
+            fetch('/health/api/summary')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.has_critical) {
+                        badge.textContent = data.critical;
+                        badge.classList.remove('hidden');
+                    }
+                })
+                .catch(() => {});
+        })();
+    </script>
+    {% endif %}
 
     {% block scripts %}{% endblock %}
 </body>

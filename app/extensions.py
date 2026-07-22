@@ -58,7 +58,7 @@ def init_extensions(app):
 
     try:
         # Import models to ensure they are registered with SQLAlchemy
-        from app.models import Job, JobRun, JobChain
+        from app.models import Job, JobRun, JobChain, AlertLog
         app.logger.info("Database models imported successfully")
     except Exception as e:
         app.logger.error(f"Failed to import database models: {e}")

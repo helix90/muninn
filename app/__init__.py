@@ -71,6 +71,7 @@ def create_app(config_name=None):
     from app.credentials import credentials_bp as credentials_blueprint
     from app.scenarios import scenarios_bp as scenarios_blueprint
     from app.webhooks import webhook_bp as webhooks_blueprint
+    from app.health import health_bp as health_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
@@ -80,6 +81,7 @@ def create_app(config_name=None):
     app.register_blueprint(credentials_blueprint)
     app.register_blueprint(scenarios_blueprint)
     app.register_blueprint(webhooks_blueprint)
+    app.register_blueprint(health_blueprint)
     
     # Register CLI commands
     from app.cli import register_commands

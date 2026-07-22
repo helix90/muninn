@@ -32,15 +32,19 @@ class TestAppFactory:
     
     def test_create_app_production_config(self):
         """Test app creation with production configuration."""
+        from app.scheduler import scheduler
         app = create_app('production')
         assert app.config['DEBUG'] is False
         assert app.config['TESTING'] is False
-    
+        scheduler.stop()
+
     def test_create_app_with_env_var(self, monkeypatch):
         """Test app creation using environment variable."""
+        from app.scheduler import scheduler
         monkeypatch.setenv('FLASK_ENV', 'production')
         app = create_app()
         assert app.config['DEBUG'] is False
+        scheduler.stop()
     
     def test_app_has_blueprints(self):
         """Test that the app has registered blueprints."""

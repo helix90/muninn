@@ -36,3 +36,9 @@ MAX_EMAIL_LENGTH = 120
 
 # Agent failure reporting
 AGENT_FAILURE_WINDOW_DAYS = 7  # look-back window for "recent" failed run counts
+
+# Agent health & alerting
+ALERT_COOLDOWN_HOURS = 4                    # minimum hours between repeat alerts for the same agent
+ALERT_CONSECUTIVE_FAILURES_CRITICAL = 3    # consecutive failures to trigger CRITICAL status
+ALERT_CONSECUTIVE_FAILURES_WARNING = 1     # consecutive failures to trigger WARNING status
+HEALTH_SWEEP_INTERVAL_MINUTES = 60         # how often the scheduler sweeps all agents for health

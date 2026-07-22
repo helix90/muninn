@@ -89,6 +89,55 @@
                 </div>
             </div>
 
+            <!-- Health & Alerting -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Health &amp; Alerting</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="alert_enabled" name="alert_enabled" value="1"
+                               {% if agent.alert_enabled %}checked{% endif %}
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="alert_enabled" class="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Enable email alerts for this agent
+                        </label>
+                    </div>
+                    <div>
+                        <label for="alert_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Alert email
+                            <span class="text-gray-500 dark:text-gray-400 font-normal">- Leave blank to use your account email</span>
+                        </label>
+                        <input type="email" id="alert_email" name="alert_email"
+                               value="{{ agent.alert_email or '' }}"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="alerts@example.com">
+                    </div>
+                    <div>
+                        <label for="expected_receive_period_in_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Expected receive period (days)
+                            <span class="text-gray-500 dark:text-gray-400 font-normal">- Alert if agent has not run successfully within this many days</span>
+                        </label>
+                        <input type="number" id="expected_receive_period_in_days" name="expected_receive_period_in_days"
+                               min="1" max="365"
+                               value="{{ agent.expected_receive_period_in_days or '' }}"
+                               class="w-40 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="e.g. 2">
+                    </div>
+                    {% if agent.health_status and agent.health_status != 'unknown' %}
+                    <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Current health:
+                        {% if agent.health_status == 'healthy' %}
+                        <span class="text-green-600 dark:text-green-400 font-medium">Healthy</span>
+                        {% elif agent.health_status == 'warning' %}
+                        <span class="text-yellow-600 dark:text-yellow-400 font-medium">Warning</span>
+                        {% elif agent.health_status == 'critical' %}
+                        <span class="text-red-600 dark:text-red-400 font-medium">Critical</span>
+                        {% endif %}
+                        ({{ agent.consecutive_failures }} consecutive failure{{ 's' if agent.consecutive_failures != 1 else '' }})
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Submit Button -->
             <div class="flex justify-end space-x-3">
                 <a href="{{ url_for('agents.agent_detail', agent_id=agent.id) }}"

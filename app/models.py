@@ -126,7 +126,16 @@ class Job(db.Model):
     schedule_enabled = Column(Boolean, default=False, nullable=False)
     last_scheduled_run = Column(DateTime, nullable=True)
     next_scheduled_run = Column(DateTime, nullable=True)
-    
+
+    # Health & alerting fields
+    alert_enabled = Column(Boolean, default=False, nullable=False)
+    alert_email = Column(String(120), nullable=True)
+    consecutive_failures = Column(Integer, default=0, nullable=False)
+    last_alerted_at = Column(DateTime, nullable=True)
+    expected_receive_period_in_days = Column(Integer, nullable=True)
+    health_status = Column(String(20), default='unknown', nullable=False)
+    health_checked_at = Column(DateTime, nullable=True)
+
     # Relationships
     user = relationship('User', back_populates='jobs')
     runs = relationship('JobRun', back_populates='job', cascade='all, delete-orphan')
@@ -146,7 +155,8 @@ class Job(db.Model):
     
     def __init__(self, name, job_type, config, user_id, description=None, tags=None,
                  priority=0, schedule_cron=None, schedule_enabled=False,
-                 last_scheduled_run=None, next_scheduled_run=None, scenario_id=None, is_active=True):
+                 last_scheduled_run=None, next_scheduled_run=None, scenario_id=None, is_active=True,
+                 alert_enabled=False, alert_email=None, expected_receive_period_in_days=None):
         self.name = name
         self.job_type = job_type
         self.config = config or {}
@@ -160,6 +170,11 @@ class Job(db.Model):
         self.last_scheduled_run = last_scheduled_run
         self.next_scheduled_run = next_scheduled_run
         self.is_active = is_active
+        self.alert_enabled = alert_enabled
+        self.alert_email = alert_email
+        self.consecutive_failures = 0
+        self.health_status = 'unknown'
+        self.expected_receive_period_in_days = expected_receive_period_in_days
     
     @validates('config')
     def validate_config(self, key, config):
@@ -617,4 +632,34 @@ class Credential(db.Model):
     )
 
     def __repr__(self):
-        return f'<Credential {self.name} for user {self.user_id}>' 
+        return f'<Credential {self.name} for user {self.user_id}>'
+
+
+class AlertLog(db.Model):
+    """Records alerts sent for agent health issues."""
+
+    __tablename__ = 'alert_logs'
+
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(Integer, ForeignKey('jobs.id', ondelete='CASCADE'), nullable=False, index=True)
+    alert_type = Column(String(50), nullable=False)   # 'failure', 'recovery', 'staleness'
+    message = Column(Text, nullable=False)
+    sent_at = Column(DateTime, default=func.now(), nullable=False)
+    recipient_email = Column(String(120), nullable=False)
+
+    # Relationships
+    agent = relationship('Job', foreign_keys=[agent_id])
+
+    # Constraints
+    __table_args__ = (
+        Index('idx_alert_logs_agent_sent', 'agent_id', 'sent_at'),
+    )
+
+    def __init__(self, agent_id, alert_type, message, recipient_email):
+        self.agent_id = agent_id
+        self.alert_type = alert_type
+        self.message = message
+        self.recipient_email = recipient_email
+
+    def __repr__(self):
+        return f'<AlertLog agent={self.agent_id} type={self.alert_type} sent={self.sent_at}>'

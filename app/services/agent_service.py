@@ -149,7 +149,18 @@ class AgentService:
             # Mark agent run as successful
             agent_run.status = 'completed'
             agent_run.completed_at = datetime.utcnow()
-            self.db_session.commit()
+
+            # Reset failure counter and recompute health
+            agent_model.consecutive_failures = 0
+            try:
+                from app.services.health_service import compute_health
+                from app.services.alert_service import check_and_alert
+                compute_health(agent_model, self.db_session)
+                self.db_session.commit()
+                check_and_alert(agent_model, self.db_session)
+            except Exception as health_err:
+                logger.warning(f"Health check error for agent {agent_id}: {health_err}")
+                self.db_session.commit()
 
             result['success'] = True
 
@@ -171,7 +182,18 @@ class AgentService:
             agent_run.status = 'failed'
             agent_run.error_message = str(e)
             agent_run.completed_at = datetime.utcnow()
-            self.db_session.commit()
+
+            # Increment failure counter and recompute health
+            agent_model.consecutive_failures = (agent_model.consecutive_failures or 0) + 1
+            try:
+                from app.services.health_service import compute_health
+                from app.services.alert_service import check_and_alert
+                compute_health(agent_model, self.db_session)
+                self.db_session.commit()
+                check_and_alert(agent_model, self.db_session)
+            except Exception as health_err:
+                logger.warning(f"Health check error for agent {agent_id}: {health_err}")
+                self.db_session.commit()
 
             result['error'] = str(e)
             return result

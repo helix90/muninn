@@ -18,6 +18,14 @@
                         Inactive
                     </span>
                     {% endif %}
+                    {% set hs = agent.health_status %}
+                    {% if hs == 'healthy' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">&#x2713; Healthy</span>
+                    {% elif hs == 'warning' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">&#x26A0; Warning</span>
+                    {% elif hs == 'critical' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">&#x2717; Critical</span>
+                    {% endif %}
                 </div>
                 <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                     <span>Type: {{ agent.job_type|replace('_', ' ')|title }}</span>

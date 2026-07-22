@@ -903,6 +903,9 @@ class TestAgentSchedulerIntegration:
         from app.models import Job
 
         with app.app_context():
+            # Initialize scheduler if not done (skipped in test mode with DEBUG=True)
+            if scheduler.scheduler is None:
+                scheduler.init_app(app)
             # Start the scheduler for this test (it's not started in test mode by default)
             if not scheduler.scheduler.running:
                 scheduler.start()

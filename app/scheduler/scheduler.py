@@ -153,6 +153,20 @@ def execute_scheduled_job(job_id: int):
         logger.error(f"Error executing scheduled job/agent {job_id}: {e}", exc_info=True)
 
 
+def execute_health_sweep():
+    """Periodic health sweep — recomputes status for all active agents."""
+    try:
+        scheduler_instance = scheduler
+        if not scheduler_instance.app:
+            return
+        with scheduler_instance.app.app_context():
+            from app.services.health_service import sweep_all_agents
+            count = sweep_all_agents()
+            logger.info(f"Health sweep completed: {count} agents evaluated")
+    except Exception as e:
+        logger.error(f"Health sweep failed: {e}", exc_info=True)
+
+
 class JobScheduler:
     """Robust job scheduler using APScheduler."""
 
@@ -240,7 +254,23 @@ class JobScheduler:
         """Load scheduled jobs from the database."""
         if not self.app:
             return
-            
+
+        # Register the hourly health sweep
+        try:
+            from app.constants import HEALTH_SWEEP_INTERVAL_MINUTES
+            self.scheduler.add_job(
+                func='app.scheduler.scheduler:execute_health_sweep',
+                trigger=IntervalTrigger(minutes=HEALTH_SWEEP_INTERVAL_MINUTES),
+                id='health_sweep',
+                name='Agent Health Sweep',
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info(f"Health sweep scheduled every {HEALTH_SWEEP_INTERVAL_MINUTES} minutes")
+        except Exception as e:
+            logger.error(f"Failed to schedule health sweep: {e}")
+
         with self.app.app_context():
             try:
                 # Get all active jobs with scheduling enabled
@@ -250,14 +280,14 @@ class JobScheduler:
                     Job.schedule_enabled == True,
                     Job.schedule_cron.isnot(None)
                 ).all()
-                
+
                 for job in scheduled_jobs:
                     try:
                         self.schedule_job(job.id, job.schedule_cron, replace_existing=True)
                         logger.info(f"Loaded scheduled job: {job.name} (ID: {job.id})")
                     except Exception as e:
                         logger.error(f"Failed to load scheduled job {job.id}: {e}")
-                        
+
             except Exception as e:
                 logger.error(f"Failed to load scheduled jobs: {e}")
     

@@ -663,3 +663,48 @@ class AlertLog(db.Model):
 
     def __repr__(self):
         return f'<AlertLog agent={self.agent_id} type={self.alert_type} sent={self.sent_at}>'
+
+
+class DataStore(db.Model):
+    """User-scoped key-value store for cross-pipeline data sharing."""
+
+    __tablename__ = 'data_store'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    namespace = Column(String(100), nullable=False)
+    key = Column(String(255), nullable=False)
+    value = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship('User', foreign_keys=[user_id])
+
+    __table_args__ = (
+        Index('idx_data_store_user_ns', 'user_id', 'namespace'),
+        Index('idx_data_store_lookup', 'user_id', 'namespace', 'key', unique=True),
+    )
+
+    def __repr__(self):
+        return f'<DataStore {self.namespace}/{self.key}>'
+
+
+class DelayedEvent(db.Model):
+    """Buffered events waiting to be released by a DelayAgent."""
+
+    __tablename__ = 'delayed_events'
+
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(Integer, ForeignKey('jobs.id', ondelete='CASCADE'), nullable=False)
+    payload = Column(JSON, nullable=False, default=dict)
+    metadata_ = Column('metadata', JSON, nullable=False, default=dict)
+    release_at = Column(DateTime, nullable=False)
+    released = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    agent = relationship('Job', foreign_keys=[agent_id])
+
+    __table_args__ = (
+        Index('idx_delayed_events_release', 'agent_id', 'release_at'),
+        Index('idx_delayed_events_pending', 'released', 'release_at'),
+    )

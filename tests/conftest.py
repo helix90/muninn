@@ -41,6 +41,8 @@ def _truncate_all_tables():
             # Delete in FK dependency order (children before parents)
             conn.execute(text("""
                 DELETE FROM alert_logs;
+                DELETE FROM delayed_events;
+                DELETE FROM data_store;
                 DELETE FROM agent_links;
                 DELETE FROM agent_memory;
                 DELETE FROM agent_runs;
@@ -52,6 +54,8 @@ def _truncate_all_tables():
                 DELETE FROM scenarios;
                 DELETE FROM users;
                 ALTER SEQUENCE alert_logs_id_seq RESTART WITH 1;
+                ALTER SEQUENCE delayed_events_id_seq RESTART WITH 1;
+                ALTER SEQUENCE data_store_id_seq RESTART WITH 1;
                 ALTER SEQUENCE agent_links_id_seq RESTART WITH 1;
                 ALTER SEQUENCE agent_memory_id_seq RESTART WITH 1;
                 ALTER SEQUENCE agent_runs_id_seq RESTART WITH 1;

@@ -410,6 +410,9 @@ def agent_detail(agent_id):
                 if not existing_link:
                     available_agents.append(potential_target)
 
+        from app.agents.sample_payloads import get_sample_payload
+        sample_payload = get_sample_payload(agent.job_type)
+
         return render_template('agents/detail.html',
                              agent=agent,
                              stats=stats,
@@ -419,7 +422,8 @@ def agent_detail(agent_id):
                              upstream_links=upstream_links,
                              downstream_links=downstream_links,
                              recent_events=recent_events,
-                             available_agents=available_agents)
+                             available_agents=available_agents,
+                             sample_payload=sample_payload)
 
     except Exception as e:
         logger.error(f"Error in agent_detail: {e}", exc_info=True)
@@ -549,6 +553,36 @@ def delete_agent(agent_id):
 
 
 @agents.route('/<int:agent_id>/test', methods=['POST'])
+@login_required
+def test_agent_payload(agent_id):
+    """Run an agent test with a user-supplied payload (ephemeral, not persisted)."""
+    try:
+        user_id = current_user.id
+
+        agent_model = db.session.query(Job).filter(
+            Job.id == agent_id,
+            Job.user_id == user_id
+        ).first()
+
+        if not agent_model:
+            return jsonify({'status': 'error', 'error': 'Agent not found'}), 404
+
+        body = request.get_json(silent=True) or {}
+        payload_dict = body.get('payload', {})
+        if not isinstance(payload_dict, dict):
+            return jsonify({'status': 'error', 'error': 'payload must be a JSON object'}), 400
+
+        from app.agents.test_runner import run_agent_test
+        result = run_agent_test(agent_model, payload_dict, db.session)
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error in test_agent_payload for agent {agent_id}: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@agents.route('/<int:agent_id>/test-connection', methods=['POST'])
 @login_required
 def test_agent_connection(agent_id):
     """Test agent connection (currently only for Jabber agents)."""

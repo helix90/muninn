@@ -351,6 +351,39 @@
         {% endif %}
     </div>
 
+    <!-- Test with Payload -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8" id="test-panel">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Test with Payload</h2>
+
+        {% if not capabilities.can_receive_events %}
+        <div class="mb-4 px-4 py-3 rounded bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-300 text-sm">
+            This is a source agent — it fetches its own data. Running a test will make a real network request to the configured source. No input payload is required.
+        </div>
+        {% endif %}
+
+        {% if capabilities.can_receive_events and not capabilities.can_create_events %}
+        <div class="mb-4 px-4 py-3 rounded bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300 text-sm">
+            This is an action agent — running a test will actually perform the action (e.g., send an email or message).
+        </div>
+        {% endif %}
+
+        {% if capabilities.can_receive_events %}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Test Payload (JSON)</label>
+            <textarea id="test-payload" rows="8" class="w-full font-mono text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ sample_payload | tojson(indent=2) }}</textarea>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Edit the payload above to match the data this agent would normally receive.</p>
+        </div>
+        {% endif %}
+
+        <button id="run-test-btn" onclick="runTest()" class="bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded">
+            Run Test
+        </button>
+
+        <div id="test-result" class="hidden mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div id="test-result-content"></div>
+        </div>
+    </div>
+
     <!-- Danger Zone -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-2 border-red-200 dark:border-red-900">
         <h2 class="text-xl font-semibold text-red-700 dark:text-red-500 mb-4">Danger Zone</h2>
@@ -548,6 +581,87 @@ function openAddDownstreamModal() {
 
 function closeAddDownstreamModal() {
     document.getElementById('addDownstreamModal').classList.add('hidden');
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function runTest() {
+    const btn = document.getElementById('run-test-btn');
+    const resultDiv = document.getElementById('test-result');
+    const resultContent = document.getElementById('test-result-content');
+
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+
+    let payload = {};
+    const payloadTextarea = document.getElementById('test-payload');
+    if (payloadTextarea) {
+        try {
+            payload = JSON.parse(payloadTextarea.value);
+        } catch (e) {
+            resultContent.innerHTML = `<div class="px-4 py-3 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 text-sm"><span class="font-semibold">Invalid JSON: </span>${escapeHtml(e.message)}</div>`;
+            resultDiv.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Run Test';
+            return;
+        }
+    }
+
+    fetch('{{ url_for("agents.test_agent_payload", agent_id=agent.id) }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({payload: payload}),
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Run Test';
+
+        let html = '';
+        if (data.status === 'error') {
+            html = `<div class="px-4 py-3 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300">
+                        <p class="font-semibold text-sm mb-1">Error</p>
+                        <p class="text-sm font-mono">${escapeHtml(data.error)}</p>
+                    </div>`;
+        } else {
+            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Completed in ${data.duration_ms}ms</p>`;
+
+            if (data.filtered) {
+                html += `<div class="px-4 py-3 rounded bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300 text-sm">Event was <strong>filtered</strong> — 0 output events.</div>`;
+            } else if (data.output_count === 0 && data.agent_category === 'action') {
+                html += `<div class="px-4 py-3 rounded bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-300 text-sm">Action executed successfully.</div>`;
+            } else if (data.output_count === 0) {
+                html += `<div class="px-4 py-3 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-sm">No output events produced.</div>`;
+            } else {
+                html += `<p class="text-sm font-medium text-green-700 dark:text-green-400 mb-3">${data.output_count} output event${data.output_count !== 1 ? 's' : ''}:</p>`;
+                data.output_events.forEach((evt, i) => {
+                    const metaStr = evt.event_metadata && Object.keys(evt.event_metadata).length
+                        ? `<p class="text-xs text-gray-400 dark:text-gray-500 mt-1">metadata: ${escapeHtml(JSON.stringify(evt.event_metadata))}</p>`
+                        : '';
+                    html += `<div class="mb-3">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Event ${i + 1}</p>
+                        <pre class="text-xs font-mono bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-x-auto text-gray-700 dark:text-gray-300 max-h-48">${escapeHtml(JSON.stringify(evt.payload, null, 2))}</pre>
+                        ${metaStr}
+                    </div>`;
+                });
+            }
+        }
+
+        resultContent.innerHTML = html;
+        resultDiv.classList.remove('hidden');
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Run Test';
+        resultContent.innerHTML = `<div class="px-4 py-3 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 text-sm">Request failed: ${escapeHtml(err.message)}</div>`;
+        resultDiv.classList.remove('hidden');
+    });
 }
 </script>
 {% endblock %}

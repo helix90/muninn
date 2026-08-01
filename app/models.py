@@ -136,6 +136,7 @@ class Job(db.Model):
     expected_receive_period_in_days = Column(Integer, nullable=True)
     health_status = Column(String(20), default='unknown', nullable=False)
     health_checked_at = Column(DateTime, nullable=True)
+    canvas_position = Column(JSON, nullable=True)  # {"x": int, "y": int} for editor
 
     # Relationships
     user = relationship('User', back_populates='jobs')

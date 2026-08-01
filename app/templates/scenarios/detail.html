@@ -14,9 +14,9 @@
                class="px-4 py-2 bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium rounded">
                 Edit Scenario
             </a>
-            <a href="{{ url_for('agents.pipeline', scenario=scenario.id) }}"
+            <a href="{{ url_for('scenarios.scenario_editor', scenario_id=scenario.id) }}"
                class="px-4 py-2 bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 text-white font-medium rounded">
-                View Pipeline
+                Open Editor
             </a>
             <a href="{{ url_for('scenarios.export_scenario_view', scenario_id=scenario.id) }}"
                class="px-4 py-2 bg-gray-600 dark:bg-gray-500 hover:bg-gray-700 dark:hover:bg-gray-400 text-white font-medium rounded">

@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Editor — {{ scenario.name }} - Muninn{% endblock %}
+
+{% block content %}
+<div class="flex flex-col" style="height: calc(100vh - 64px);">
+
+    <!-- Toolbar -->
+    <div class="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('scenarios.scenario_detail', scenario_id=scenario.id) }}"
+               class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm">
+                &larr; {{ scenario.name }}
+            </a>
+            <span class="text-gray-300 dark:text-gray-600">|</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Pipeline Editor</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Save state indicator -->
+            <span id="save-indicator" class="text-xs text-gray-400 dark:text-gray-500 mr-2 hidden">Unsaved changes</span>
+
+            <button id="btn-layout"
+                    class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600">
+                Auto-layout
+            </button>
+
+            <a href="{{ url_for('scenarios.scenario_detail', scenario_id=scenario.id) }}"
+               class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600">
+                + Add Agent
+            </a>
+
+            <button id="btn-save"
+                    class="px-4 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium disabled:opacity-50">
+                Save
+            </button>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex items-center gap-4 px-4 py-1.5 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
+        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-green-500"></span>Source</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-blue-500"></span>Transform</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-amber-500"></span>Action</span>
+        <span class="ml-2">Drag from the right handle of a node to the left handle of another to connect them. Click an edge then press Delete to remove it.</span>
+    </div>
+
+    <!-- Canvas -->
+    <div id="rf-root" class="flex-1 bg-gray-50 dark:bg-gray-950" style="min-height:0;"></div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg text-sm text-white hidden z-50"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11/dist/style.css">
+<script>
+    // Pass server-side data to the module
+    window.__EDITOR_DATA__ = {
+        scenarioId: {{ scenario.id }},
+        graphUrl: "{{ url_for('scenarios.editor_graph_get', scenario_id=scenario.id) }}",
+        saveUrl:  "{{ url_for('scenarios.editor_graph_put', scenario_id=scenario.id) }}",
+        isDark: document.documentElement.classList.contains('dark'),
+    };
+</script>
+<script type="module">
+import React, { useState, useCallback, useEffect, useRef } from 'https://esm.sh/react@18';
+import { createRoot } from 'https://esm.sh/react-dom@18/client';
+import ReactFlow, {
+    Background, Controls, MiniMap,
+    addEdge, useNodesState, useEdgesState,
+    MarkerType, Handle, Position,
+    applyNodeChanges, applyEdgeChanges,
+} from 'https://esm.sh/reactflow@11?deps=react@18,react-dom@18';
+
+const { scenarioId, graphUrl, saveUrl, isDark } = window.__EDITOR_DATA__;
+
+// ---------------------------------------------------------------------------
+// Category config
+// ---------------------------------------------------------------------------
+const CATEGORY = {
+    source:    { border: '#22c55e', bg: '#f0fdf4', bgDark: '#052e16', label: 'Source' },
+    transform: { border: '#3b82f6', bg: '#eff6ff', bgDark: '#172554', label: 'Transform' },
+    action:    { border: '#f59e0b', bg: '#fffbeb', bgDark: '#1c1400', label: 'Action' },
+};
+
+// ---------------------------------------------------------------------------
+// Custom node component
+// ---------------------------------------------------------------------------
+function AgentNode({ data }) {
+    const cat = CATEGORY[data.category] || CATEGORY.transform;
+    const dark = document.documentElement.classList.contains('dark');
+    const bg = dark ? cat.bgDark : cat.bg;
+
+    return React.createElement('div', {
+        style: {
+            background: bg,
+            border: `2px solid ${cat.border}`,
+            borderRadius: 8,
+            padding: '10px 14px',
+            minWidth: 200,
+            maxWidth: 240,
+            boxShadow: '0 1px 4px rgba(0,0,0,.15)',
+            cursor: 'default',
+        }
+    },
+        // Target (input) handle — left
+        data.canReceiveEvents && React.createElement(Handle, {
+            type: 'target', position: Position.Left,
+            style: { background: cat.border, width: 10, height: 10 },
+        }),
+
+        // Node body
+        React.createElement('div', null,
+            React.createElement('div', {
+                style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }
+            },
+                React.createElement('span', {
+                    style: {
+                        display: 'inline-block', width: 8, height: 8,
+                        borderRadius: '50%',
+                        background: data.isActive ? '#22c55e' : '#9ca3af',
+                        flexShrink: 0,
+                    }
+                }),
+                React.createElement('span', {
+                    style: {
+                        fontSize: 13, fontWeight: 600,
+                        color: dark ? '#f3f4f6' : '#111827',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        maxWidth: 180,
+                    }
+                }, data.name),
+            ),
+            React.createElement('div', {
+                style: {
+                    fontSize: 11,
+                    color: dark ? '#9ca3af' : '#6b7280',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }
+            },
+                React.createElement('span', null, data.jobType.replace(/_agent$/, '').replace(/_/g, ' ')),
+                React.createElement('a', {
+                    href: `/agents/${data.agentId}`,
+                    target: '_blank',
+                    onClick: e => e.stopPropagation(),
+                    style: { color: cat.border, textDecoration: 'none', fontSize: 11 },
+                }, 'Edit →'),
+            ),
+        ),
+
+        // Source (output) handle — right
+        data.canCreateEvents && React.createElement(Handle, {
+            type: 'source', position: Position.Right,
+            style: { background: cat.border, width: 10, height: 10 },
+        }),
+    );
+}
+
+const nodeTypes = { agentNode: AgentNode };
+
+// ---------------------------------------------------------------------------
+// Utility: server graph → React Flow nodes/edges
+// ---------------------------------------------------------------------------
+function graphToFlow(graph) {
+    const nodes = graph.agents.map(a => ({
+        id: String(a.id),
+        type: 'agentNode',
+        position: a.position || { x: 100, y: 100 },
+        data: {
+            agentId: a.id,
+            name: a.name,
+            jobType: a.job_type,
+            category: a.category,
+            canReceiveEvents: a.can_receive_events,
+            canCreateEvents: a.can_create_events,
+            isActive: a.is_active,
+        },
+    }));
+    const edges = graph.links.map(l => ({
+        id: `e-${l.id}`,
+        source: String(l.source),
+        target: String(l.target),
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        data: { linkId: l.id },
+        style: { strokeWidth: 2 },
+    }));
+    return { nodes, edges };
+}
+
+// ---------------------------------------------------------------------------
+// Main editor component
+// ---------------------------------------------------------------------------
+function PipelineEditor() {
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [dirty, setDirty] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [toast, setToast] = useState(null);
+
+    // Track pending link diffs
+    const addLinks = useRef([]);   // [{source, target}]
+    const removeLinks = useRef([]); // [linkId]
+
+    // Load graph on mount
+    useEffect(() => {
+        fetch(graphUrl)
+            .then(r => r.json())
+            .then(graph => {
+                const { nodes: n, edges: e } = graphToFlow(graph);
+                setNodes(n);
+                setEdges(e);
+            })
+            .catch(err => showToast('Failed to load graph: ' + err.message, 'error'));
+    }, []);
+
+    // Mark dirty when nodes move
+    const handleNodesChange = useCallback(changes => {
+        onNodesChange(changes);
+        if (changes.some(c => c.type === 'position' && c.dragging === false)) {
+            setDirty(true);
+        }
+    }, [onNodesChange]);
+
+    // Edge connect
+    const onConnect = useCallback(params => {
+        const newEdge = {
+            ...params,
+            type: 'smoothstep',
+            markerEnd: { type: MarkerType.ArrowClosed },
+            style: { strokeWidth: 2 },
+            data: { linkId: null }, // pending
+        };
+        setEdges(eds => addEdge(newEdge, eds));
+        addLinks.current.push({ source: parseInt(params.source), target: parseInt(params.target) });
+        setDirty(true);
+    }, [setEdges]);
+
+    // Edge removal
+    const handleEdgesChange = useCallback(changes => {
+        onEdgesChange(changes);
+        for (const c of changes) {
+            if (c.type === 'remove') {
+                const edge = edges.find(e => e.id === c.id);
+                if (edge?.data?.linkId) {
+                    removeLinks.current.push(edge.data.linkId);
+                }
+                setDirty(true);
+            }
+        }
+    }, [edges, onEdgesChange]);
+
+    // Save
+    const handleSave = useCallback(async () => {
+        setSaving(true);
+        const positions = {};
+        for (const node of nodes) {
+            positions[node.id] = node.position;
+        }
+        const body = {
+            positions,
+            add_links: addLinks.current,
+            remove_links: removeLinks.current,
+        };
+        try {
+            const resp = await fetch(saveUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                addLinks.current = [];
+                removeLinks.current = [];
+                setDirty(false);
+                if (data.errors && data.errors.length) {
+                    showToast('Saved with warnings: ' + data.errors.join('; '), 'warn');
+                } else {
+                    showToast('Saved', 'ok');
+                }
+                // Reload to get server-assigned link IDs into edge data
+                const g = await fetch(graphUrl).then(r => r.json());
+                const { nodes: n, edges: e } = graphToFlow(g);
+                setNodes(n);
+                setEdges(e);
+            } else {
+                showToast('Save failed: ' + (data.error || 'unknown error'), 'error');
+            }
+        } catch (err) {
+            showToast('Save failed: ' + err.message, 'error');
+        } finally {
+            setSaving(false);
+        }
+    }, [nodes, saveUrl]);
+
+    // Auto-layout: wipe positions so server recomputes them on next GET
+    const handleAutoLayout = useCallback(async () => {
+        // Clear all positions on the backend by saving empty positions dict
+        await fetch(saveUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ positions: {}, add_links: [], remove_links: [] }),
+        });
+        // Wipe canvas_position server-side by patching each agent to null
+        // Easiest: just DELETE all positions by posting a zero dict, then force
+        // recompute by setting canvas_position=null on each agent via a special param
+        // Actually the simplest approach: reload graph; auto-layout runs on GET
+        // when agents have no position. So wipe positions by setting them to
+        // something sentinel... Instead, let's just request a fresh layout.
+        // We'll do this by calling a separate endpoint or just reloading.
+        const resp = await fetch(graphUrl + '?reset_layout=1');
+        const graph = await resp.json();
+        const { nodes: n, edges: e } = graphToFlow(graph);
+        setNodes(n);
+        setEdges(e);
+        addLinks.current = [];
+        removeLinks.current = [];
+        setDirty(false);
+        showToast('Layout reset', 'ok');
+    }, [saveUrl, graphUrl]);
+
+    function showToast(msg, type) {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    }
+
+    // Wire toolbar buttons
+    useEffect(() => {
+        const saveBtn = document.getElementById('btn-save');
+        const layoutBtn = document.getElementById('btn-layout');
+        const ind = document.getElementById('save-indicator');
+        if (saveBtn) saveBtn.onclick = handleSave;
+        if (layoutBtn) layoutBtn.onclick = handleAutoLayout;
+        if (ind) {
+            if (dirty) ind.classList.remove('hidden');
+            else ind.classList.add('hidden');
+        }
+        if (saveBtn) saveBtn.disabled = saving;
+    }, [handleSave, handleAutoLayout, dirty, saving]);
+
+    // Toast DOM
+    useEffect(() => {
+        const el = document.getElementById('toast');
+        if (!el) return;
+        if (!toast) { el.classList.add('hidden'); return; }
+        el.classList.remove('hidden');
+        el.textContent = toast.msg;
+        el.style.background = toast.type === 'error' ? '#dc2626'
+            : toast.type === 'warn' ? '#d97706' : '#16a34a';
+    }, [toast]);
+
+    const dark = document.documentElement.classList.contains('dark');
+
+    return React.createElement(ReactFlow, {
+        nodes,
+        edges,
+        nodeTypes,
+        onNodesChange: handleNodesChange,
+        onEdgesChange: handleEdgesChange,
+        onConnect,
+        fitView: true,
+        fitViewOptions: { padding: 0.15 },
+        deleteKeyCode: 'Delete',
+        style: { width: '100%', height: '100%' },
+    },
+        React.createElement(Background, {
+            color: dark ? '#374151' : '#d1d5db',
+            gap: 20,
+        }),
+        React.createElement(Controls, { style: { bottom: 16, left: 16 } }),
+        React.createElement(MiniMap, {
+            nodeColor: n => {
+                const cat = n.data?.category || 'transform';
+                return CATEGORY[cat]?.border || '#3b82f6';
+            },
+            style: { bottom: 16, right: 16 },
+        }),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Mount
+// ---------------------------------------------------------------------------
+const root = createRoot(document.getElementById('rf-root'));
+root.render(React.createElement(PipelineEditor));
+</script>
+{% endblock %}

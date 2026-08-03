@@ -252,6 +252,105 @@ class TestScenariosApi:
 
 
 # ---------------------------------------------------------------------------
+# Scenario import API
+# ---------------------------------------------------------------------------
+
+def _valid_import_doc(name="Imported"):
+    return {
+        "schema_version": 1,
+        "scenario": {"name": name, "description": "", "color": "#3B82F6", "is_active": True},
+        "agents": [
+            {
+                "export_id": 0,
+                "name": "RSS Feed",
+                "job_type": "rss_agent",
+                "config": {"feed_url": "https://example.com/feed"},
+                "schedule_cron": None,
+                "schedule_enabled": False,
+                "is_active": True,
+                "priority": 0,
+            },
+            {
+                "export_id": 1,
+                "name": "Email Alert",
+                "job_type": "email_agent",
+                "config": {"to_email": "a@b.com", "subject": "x", "body": "y"},
+                "schedule_cron": None,
+                "schedule_enabled": False,
+                "is_active": True,
+                "priority": 0,
+            },
+        ],
+        "links": [{"source": 0, "target": 1}],
+    }
+
+
+class TestScenarioImportApi:
+    def test_import_creates_scenario(self, bearer):
+        resp = bearer.post('/api/v1/scenarios/import', _valid_import_doc())
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data['name'] == 'Imported'
+        assert data['scenario_id'] is not None
+
+    def test_import_creates_agents(self, bearer):
+        resp = bearer.post('/api/v1/scenarios/import', _valid_import_doc())
+        assert resp.get_json()['agent_count'] == 2
+
+    def test_import_creates_correct_links(self, bearer, db_session):
+        from app.models import AgentLink
+        resp = bearer.post('/api/v1/scenarios/import', _valid_import_doc())
+        sid = resp.get_json()['scenario_id']
+        jobs = sorted(
+            db_session.query(Job).filter_by(scenario_id=sid).all(),
+            key=lambda j: j.id,
+        )
+        assert len(jobs) == 2
+        link = db_session.query(AgentLink).filter_by(
+            source_agent_id=jobs[0].id, target_agent_id=jobs[1].id,
+        ).first()
+        assert link is not None
+
+    def test_import_bad_json_returns_400(self, bearer, client, api_token):
+        raw, _ = api_token
+        resp = client.post(
+            '/api/v1/scenarios/import',
+            data='not json',
+            headers={'Authorization': f'Bearer {raw}', 'Content-Type': 'application/json'},
+        )
+        assert resp.status_code == 400
+
+    def test_import_unknown_agent_type_returns_400(self, bearer):
+        doc = _valid_import_doc()
+        doc['agents'][0]['job_type'] = 'nonexistent_agent_xyz'
+        resp = bearer.post('/api/v1/scenarios/import', doc)
+        assert resp.status_code == 400
+        assert 'Unknown' in resp.get_json()['error']
+
+    def test_import_wrong_schema_version_returns_400(self, bearer):
+        doc = _valid_import_doc()
+        doc['schema_version'] = 99
+        resp = bearer.post('/api/v1/scenarios/import', doc)
+        assert resp.status_code == 400
+
+    def test_import_requires_auth(self, client):
+        resp = client.post(
+            '/api/v1/scenarios/import',
+            data=json.dumps(_valid_import_doc()),
+            content_type='application/json',
+        )
+        assert resp.status_code == 401
+
+    def test_import_returns_warnings_for_missing_credentials(self, bearer):
+        doc = _valid_import_doc()
+        doc['agents'][0]['config']['api_key'] = '{{credential:my_secret}}'
+        resp = bearer.post('/api/v1/scenarios/import', doc)
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert isinstance(data['warnings'], list)
+
+
+# ---------------------------------------------------------------------------
 # Token management UI
 # ---------------------------------------------------------------------------
 

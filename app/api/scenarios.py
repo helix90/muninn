@@ -1,10 +1,17 @@
 """REST API endpoints for scenarios."""
 
+import json
+
 from flask import g, jsonify, request
 from app.api import api_bp
 from app.api.auth import require_api_auth
 from app.extensions import db
 from app.models import Job, Scenario
+from app.scenarios.export_import import (
+    ImportValidationError,
+    import_scenario,
+    validate_import_document,
+)
 
 
 def _scenario_to_dict(s: Scenario) -> dict:
@@ -68,6 +75,34 @@ def update_scenario(scenario_id):
             setattr(s, field, data[field])
     db.session.commit()
     return jsonify(_scenario_to_dict(s))
+
+
+@api_bp.route('/scenarios/import', methods=['POST'])
+@require_api_auth
+def import_scenario_api():
+    """Accept a Muninn import document as JSON and create the scenario."""
+    body = request.get_json(silent=True)
+    if body is None:
+        return jsonify({'error': 'Request body must be valid JSON.'}), 400
+
+    try:
+        doc = validate_import_document(json.dumps(body).encode())
+    except ImportValidationError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    try:
+        scenario, warnings = import_scenario(doc, g.api_user.id)
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'error': f'Import failed: {exc}'}), 500
+
+    agent_count = Job.query.filter_by(scenario_id=scenario.id).count()
+    return jsonify({
+        'scenario_id': scenario.id,
+        'name': scenario.name,
+        'agent_count': agent_count,
+        'warnings': warnings,
+    }), 201
 
 
 @api_bp.route('/scenarios/<int:scenario_id>', methods=['DELETE'])

@@ -141,17 +141,20 @@ def translate_liquid(template: str) -> str:
     if not isinstance(template, str):
         return template
 
-    # Huginn credential references: {% credential name %} → {{credential:name}}
-    result = re.sub(r"\{%-?\s*credential\s+(\w+)\s*-?%\}", r"{{credential:\1}}", template)
-
-    # Normalise Liquid tag whitespace ({{ foo }} and {% if x %})
-    result = re.sub(r"\{\{\s*", "{{ ", result)
+    # Normalise Liquid tag whitespace first ({{ foo }} and {% if x %})
+    result = re.sub(r"\{\{\s*", "{{ ", template)
     result = re.sub(r"\s*\}\}", " }}", result)
     result = re.sub(r"\{%\s*", "{% ", result)
     result = re.sub(r"\s*%\}", " %}", result)
 
+    # Apply filter substitutions
     for pattern, replacement in _LIQUID_FILTER_SUBS:
         result = re.sub(pattern, replacement, result)
+
+    # Credential references LAST so the whitespace normaliser above doesn't
+    # re-add spaces inside the {{credential:…}} tags Muninn expects.
+    # {% credential name %} → {{credential:name}}
+    result = re.sub(r"\{%\s*credential\s+(\w+)\s*%\}", r"{{credential:\1}}", result)
 
     return result
 
@@ -288,7 +291,7 @@ def _translate_post(opts: dict) -> Tuple[str, dict]:
     if opts.get("content_type") == "json":
         headers.setdefault("Content-Type", "application/json")
     config: dict = {
-        "url": opts.get("post_url", ""),
+        "url": translate_liquid(opts.get("post_url", "")),
         "method": method,
     }
     if headers:
@@ -300,7 +303,7 @@ def _translate_post(opts: dict) -> Tuple[str, dict]:
 
 def _translate_slack(opts: dict) -> Tuple[str, dict]:
     config: dict = {
-        "webhook_url": opts.get("webhook_url", ""),
+        "webhook_url": translate_liquid(opts.get("webhook_url", "")),
         "message_template": translate_liquid(opts.get("message", "{{ message }}")),
     }
     for opt_key, cfg_key in [("username", "username"), ("icon", "icon_emoji"), ("channel", "channel")]:
@@ -311,7 +314,7 @@ def _translate_slack(opts: dict) -> Tuple[str, dict]:
 
 def _translate_telegram(opts: dict) -> Tuple[str, dict]:
     return "telegram_agent", {
-        "bot_token": opts.get("token", opts.get("bot_token", "")),
+        "bot_token": translate_liquid(opts.get("token", opts.get("bot_token", ""))),
         "chat_id": str(opts.get("chat_id", "")),
         "message_template": translate_liquid(opts.get("text", opts.get("message", "{{ message }}"))),
     }
@@ -369,6 +372,67 @@ def _translate_imap(opts: dict) -> Tuple[str, dict]:
     }
 
 
+def _translate_weather(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's WeatherAgent to a web_fetch_agent hitting Pirate Weather.
+
+    Pirate Weather is a drop-in Dark Sky replacement: https://pirateweather.net
+    Endpoint: GET https://api.pirateweather.net/forecast/{api_key}/{lat},{lon}?units=…
+    Returns a JSON blob with current/hourly/daily forecasts; add a jsonpath_agent
+    downstream to extract the specific fields you need.
+
+    API key: any non-empty key in the Huginn config is replaced with
+    {{credential:pirate_weather_api_key}} so the real key stays out of the
+    import document.  Create that credential in Muninn before running the agent.
+    """
+    # --- API key ---
+    raw_key = opts.get("api_key", opts.get("key", ""))
+    if raw_key:
+        # Replace literal key with a credential reference regardless of value.
+        # If the Huginn config already used {% credential … %}, translate_liquid
+        # would have produced {{credential:…}} — accept that form too.
+        if raw_key.startswith("{{credential:"):
+            key_ref = raw_key
+        else:
+            key_ref = "{{credential:pirate_weather_api_key}}"
+    else:
+        key_ref = "{{credential:pirate_weather_api_key}}"
+
+    # --- Coordinates ---
+    lat = str(opts.get("lat", opts.get("latitude", ""))).strip()
+    lon = str(opts.get("lng", opts.get("lon", opts.get("longitude", "")))).strip()
+
+    if not (lat and lon):
+        # Try to parse a "lat,lon" string from the location field
+        location = opts.get("location", "").strip()
+        parts = [p.strip() for p in location.split(",")]
+        if len(parts) == 2:
+            try:
+                float(parts[0])
+                float(parts[1])
+                lat, lon = parts[0], parts[1]
+            except ValueError:
+                # City name — geocoding is outside the scope of this tool
+                lat, lon = "LATITUDE", "LONGITUDE"
+        else:
+            lat, lon = "LATITUDE", "LONGITUDE"
+
+    # --- Units ---
+    # Huginn uses "m"/"metric" (→ si) and "f"/"imperial" (→ us); Pirate Weather
+    # accepts the same unit strings as Dark Sky: auto, us, si, ca, uk2.
+    huginn_units = str(opts.get("units", "si")).lower().strip()
+    units = {
+        "m": "si", "metric": "si",
+        "f": "us", "imperial": "us",
+    }.get(huginn_units, huginn_units if huginn_units in ("auto", "us", "si", "ca", "uk2") else "si")
+
+    url = (
+        f"https://api.pirateweather.net/forecast/{key_ref}/{lat},{lon}"
+        f"?units={units}&exclude=minutely,flags"
+    )
+    return "web_fetch_agent", {"url": url}
+
+
 # ---------------------------------------------------------------------------
 # Type dispatch tables
 # ---------------------------------------------------------------------------
@@ -391,6 +455,7 @@ _TRANSLATORS: Dict[str, Any] = {
     "manualevent":     _translate_manual,
     "imap":            _translate_imap,
     "imapfolder":      _translate_imap,
+    "weather":         _translate_weather,
 }
 
 # Huginn agents that are absorbed (schedule propagated to targets, no Muninn agent created)
@@ -620,7 +685,11 @@ def translate_all(
 
         _APPROX_TYPES = {"filter_agent", "template_agent", "email_agent", "web_fetch_agent"}
         if job_type in _APPROX_TYPES:
-            report.approximated.append((h_name, job_type, "config approximated"))
+            if tkey == "weather":
+                note = "→ Pirate Weather API (set credential:pirate_weather_api_key)"
+            else:
+                note = "config approximated"
+            report.approximated.append((h_name, job_type, note))
         else:
             report.imported.append((h_name, job_type))
 

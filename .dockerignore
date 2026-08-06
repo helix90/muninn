@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Tests and dev tooling
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+pytest.ini
+.flake8
+
+# Version control
+.git/
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Project-specific data files
+"Huginn Scenarios"/
+rube-goldberg.json
+the_daily_broadsheet.json
+=1.*

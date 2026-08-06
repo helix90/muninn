@@ -153,4 +153,4 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-.dockerignore 
+# .dockerignore is intentionally tracked in git 

@@ -15,6 +15,8 @@ services:
       - DATABASE_URL=postgresql://muninn_user:muninn_pass@postgres:5432/muninn_dev
       - TEST_DATABASE_URL=postgresql://muninn_user:muninn_pass@postgres:5432/muninn_test
     volumes:
+      # Mounts host source into the container for live reloading in development.
+      # Remove this bind-mount when deploying from a built image in production.
       - .:/app
       - ./logs:/app/logs
     depends_on:

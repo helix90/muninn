@@ -98,13 +98,24 @@ _SCHEDULE_MAP: Dict[str, Tuple[Optional[str], bool]] = {
 }
 
 
+def _looks_like_cron(s: str) -> bool:
+    """True if s is a 5-field cron expression (digits, *, /, ,, -)."""
+    parts = s.strip().split()
+    return len(parts) == 5 and all(re.match(r'^[\d*/,\-]+$', p) for p in parts)
+
+
 def translate_schedule(huginn_schedule: str) -> Tuple[Optional[str], bool]:
     """Convert a Huginn schedule string to (cron_expr_or_None, enabled)."""
-    s = (huginn_schedule or "never").lower().strip()
+    raw = (huginn_schedule or "never").strip()
+    s = raw.lower()
     result = _SCHEDULE_MAP.get(s)
-    if result is None:
-        return (None, False)
-    return result
+    if result is not None:
+        return result
+    # Some Huginn exports (and SchedulerAgent options) already contain a cron
+    # expression instead of one of the named strings above.
+    if _looks_like_cron(raw):
+        return (raw, True)
+    return (None, False)
 
 
 # ---------------------------------------------------------------------------
@@ -372,6 +383,36 @@ def _translate_imap(opts: dict) -> Tuple[str, dict]:
     }
 
 
+def _translate_jabber(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's JabberAgent to Muninn's jabber_agent.
+
+    Huginn fields  → Muninn fields
+    jabber_sender  → jid
+    jabber_password → password
+    jabber_receiver → recipient
+    message        → message_template
+    jabber_server  → server (optional)
+    jabber_port    → port (optional, default 5222)
+    """
+    config: dict = {
+        "jid":              translate_liquid(opts.get("jabber_sender", "")),
+        "password":         translate_liquid(opts.get("jabber_password", "")),
+        "recipient":        opts.get("jabber_receiver", ""),
+        "message_template": translate_liquid(opts.get("message", "{{ message }}")),
+    }
+    server = opts.get("jabber_server", "")
+    if server:
+        config["server"] = server
+    try:
+        port = int(opts.get("jabber_port", 5222))
+        if port != 5222:
+            config["port"] = port
+    except (TypeError, ValueError):
+        pass
+    return "jabber_agent", config
+
+
 def _translate_weather(opts: dict) -> Tuple[str, dict]:
     """
     Translate Huginn's WeatherAgent to a web_fetch_agent hitting Pirate Weather.
@@ -455,6 +496,7 @@ _TRANSLATORS: Dict[str, Any] = {
     "manualevent":     _translate_manual,
     "imap":            _translate_imap,
     "imapfolder":      _translate_imap,
+    "jabber":          _translate_jabber,
     "weather":         _translate_weather,
 }
 
@@ -517,7 +559,13 @@ def preprocess(data: dict) -> Tuple[List[dict], List[dict], Dict[int, Tuple], Li
     raw_overrides: Dict[int, Tuple] = {}
     for cl in control_links:
         ctrl = cl.get("controller")
-        targets = cl.get("control_targets", [])
+        # Huginn exports use either "control_targets" (list) or "control_target" (int)
+        targets = cl.get("control_targets")
+        if targets is None:
+            t = cl.get("control_target")
+            targets = [t] if t is not None else []
+        elif not isinstance(targets, list):
+            targets = [targets]
         if ctrl in scheduler_old_idxs:
             sched_str = agents[ctrl].get("options", {}).get("schedule", "never")
             cron, enabled = translate_schedule(sched_str)

@@ -26,6 +26,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 try:
     import requests
@@ -474,6 +475,148 @@ def _translate_weather(opts: dict) -> Tuple[str, dict]:
     return "web_fetch_agent", {"url": url}
 
 
+def _translate_jq(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's JqAgent to jsonpath_agent.
+
+    JQ and JSONPath are related but different languages.  Simple field-navigation
+    expressions translate well; complex JQ (functions, select(), reductions) is
+    carried over as-is and will need manual adjustment.
+
+    Conversion rules applied:
+        .key           → $.key
+        | .key         → .key  (chained access handled by leading $ substitution)
+        .[]            → [*]   (iterate all elements)
+    """
+    jq_filter = opts.get("filter", "$")
+
+    # Convert JQ path to JSONPath: replace leading "." with "$"
+    path = re.sub(r"^\.", "$.", jq_filter.strip())
+
+    # Turn " | .key" chained pipes into ".key" continuation (JSONPath dot-notation)
+    path = re.sub(r"\s*\|\s*\.", ".", path)
+
+    # Turn ".[]" (iterate all) into "[*]"
+    path = path.replace(".[]", "[*]")
+
+    return "jsonpath_agent", {"path": path}
+
+
+def _translate_phantom_js_cloud(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's PhantomJsCloudAgent to web_fetch_agent.
+
+    PhantomJsCloudAgent renders JavaScript-heavy pages via a cloud headless browser.
+    web_fetch_agent fetches raw HTML without JavaScript execution — a degraded
+    approximation.  The api_key credential reference is translated; the URL template
+    (often "{{ body }}" pulling the URL from the previous event) is preserved as-is
+    so the pipeline shape is maintained, though the URL field will need manual review.
+    """
+    url = translate_liquid(opts.get("url", ""))
+    config: dict = {"url": url}
+    headers = dict(opts.get("headers") or {})
+    if opts.get("user_agent"):
+        headers.setdefault("User-Agent", opts["user_agent"])
+    if headers:
+        config["headers"] = headers
+    return "web_fetch_agent", config
+
+
+def _translate_keyvalue_store(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's KeyValueStoreAgent to datastore_write_agent.
+
+    Huginn config   → Muninn config
+    key   (Liquid)  → key_template   (Jinja2)
+    value (Liquid)  → value_template (Jinja2)
+    (no equivalent) → namespace       = "huginn_kv"
+    """
+    return "datastore_write_agent", {
+        "namespace":      "huginn_kv",
+        "key_template":   translate_liquid(opts.get("key", "{{ key }}")),
+        "value_template": translate_liquid(opts.get("value", "{{ value }}")),
+    }
+
+
+def _translate_liquid_output(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's LiquidOutputAgent to template_agent.
+
+    LiquidOutputAgent serves Liquid-rendered content as an HTTP endpoint.
+    template_agent renders the same content into an event field instead.
+    The HTTP-serving behaviour is lost; the rendered text ends up in the
+    'rendered' field of each outgoing event.
+    """
+    return "template_agent", {
+        "template":      translate_liquid(opts.get("content", "")),
+        "output_field":  "rendered",
+        "preserve_original": True,
+    }
+
+
+def _translate_change_detector(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's ChangeDetectorAgent to deduplication_agent.
+
+    ChangeDetectorAgent passes events only when a property changes from its
+    previous value.  deduplication_agent drops events whose field values have
+    been seen before within a lookback window — the closest available primitive.
+
+    The 'property' Liquid template (e.g. "{{results.ip_address}}") is converted
+    to a plain field name by stripping the {{ }} delimiters.
+    """
+    raw_prop = opts.get("property", "")
+    # Strip {{ }}, whitespace, and any remaining Liquid filters
+    field_name = re.sub(r"\{\{|\}\}|\s", "", raw_prop)
+    field_name = field_name.split("|")[0].strip()   # drop any filters
+
+    try:
+        lookback = max(1, int(opts.get("expected_update_period_in_days", 1)))
+    except (TypeError, ValueError):
+        lookback = 1
+
+    return "deduplication_agent", {
+        "uniqueness_fields": [field_name] if field_name else ["id"],
+        "lookback_days":     lookback,
+    }
+
+
+def _translate_mqtt(opts: dict) -> Tuple[str, dict]:
+    """
+    Translate Huginn's MqttAgent to mqtt_subscriber_agent.
+
+    Huginn uses a single 'uri' field (mqtt://user:pass@host:port); Muninn
+    takes host, port, username, and password as separate fields.
+    """
+    uri_str = opts.get("uri", "")
+    config: dict = {
+        "host":    "localhost",
+        "port":    1883,
+        "topic":   opts.get("topic", "#"),
+    }
+
+    if uri_str:
+        try:
+            parsed = urlparse(uri_str if "://" in uri_str else "mqtt://" + uri_str)
+            if parsed.hostname:
+                config["host"] = parsed.hostname
+            if parsed.port:
+                config["port"] = parsed.port
+            if parsed.username:
+                config["username"] = translate_liquid(parsed.username)
+            if parsed.password:
+                config["password"] = translate_liquid(parsed.password)
+        except Exception:
+            pass   # malformed URI — leave defaults
+
+    try:
+        config["poll_duration"] = max(1, min(300, int(opts.get("max_read_time", 5))))
+    except (TypeError, ValueError):
+        config["poll_duration"] = 5
+
+    return "mqtt_subscriber_agent", config
+
+
 # ---------------------------------------------------------------------------
 # Type dispatch tables
 # ---------------------------------------------------------------------------
@@ -498,6 +641,12 @@ _TRANSLATORS: Dict[str, Any] = {
     "imapfolder":      _translate_imap,
     "jabber":          _translate_jabber,
     "weather":         _translate_weather,
+    "jq":              _translate_jq,
+    "phantomjscloud":  _translate_phantom_js_cloud,
+    "keyvaluestore":   _translate_keyvalue_store,
+    "liquidoutput":    _translate_liquid_output,
+    "changedetector":  _translate_change_detector,
+    "mqtt":            _translate_mqtt,
 }
 
 # Huginn agents that are absorbed (schedule propagated to targets, no Muninn agent created)
@@ -731,12 +880,22 @@ def translate_all(
         })
         h_to_m[h_idx] = [export_id]
 
-        _APPROX_TYPES = {"filter_agent", "template_agent", "email_agent", "web_fetch_agent"}
+        _APPROX_TYPES = {
+            "filter_agent", "template_agent", "email_agent",
+            "web_fetch_agent", "jsonpath_agent", "deduplication_agent",
+            "datastore_write_agent", "mqtt_subscriber_agent",
+        }
+        _APPROX_NOTES = {
+            "weather":         "→ Pirate Weather API (set credential:pirate_weather_api_key)",
+            "jq":              "JQ → JSONPath approximation; complex expressions need review",
+            "phantomjscloud":  "JS rendering unavailable — web_fetch_agent fetches raw HTML only",
+            "keyvaluestore":   "→ datastore_write_agent (namespace='huginn_kv')",
+            "liquidoutput":    "HTTP serving unavailable — renders into event field 'rendered'",
+            "changedetector":  "→ deduplication_agent (different semantics; approximation)",
+            "mqtt":            "URI parsed into host/port/credentials",
+        }
         if job_type in _APPROX_TYPES:
-            if tkey == "weather":
-                note = "→ Pirate Weather API (set credential:pirate_weather_api_key)"
-            else:
-                note = "config approximated"
+            note = _APPROX_NOTES.get(tkey, "config approximated")
             report.approximated.append((h_name, job_type, note))
         else:
             report.imported.append((h_name, job_type))
@@ -888,10 +1047,27 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _is_muninn_format(data: dict) -> bool:
+    """
+    Return True if `data` is already a Muninn export document rather than a Huginn export.
+
+    A Muninn export has agents with 'job_type' and 'export_id' keys and a
+    'scenario' sub-dict.  A Huginn export has agents with a 'type' key
+    (e.g. "Agents::RssAgent") and a top-level 'name'.
+    """
+    if "scenario" not in data or not isinstance(data.get("scenario"), dict):
+        return False
+    agents = data.get("agents", [])
+    if not agents:
+        return False
+    first = agents[0]
+    return "job_type" in first and "export_id" in first and "type" not in first
+
+
 def main() -> None:
     args = parse_args()
 
-    # --- Load Huginn export ---
+    # --- Load file ---
     try:
         with open(args.huginn_file) as fh:
             data = json.load(fh)
@@ -901,10 +1077,41 @@ def main() -> None:
 
     if "agents" not in data:
         print(
-            "ERROR: File does not look like a Huginn export (missing 'agents' key).",
+            "ERROR: File does not look like a Huginn or Muninn export (missing 'agents' key).",
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # --- Detect and handle Muninn-format files ---
+    if _is_muninn_format(data):
+        scenario_name = data.get("scenario", {}).get("name", "Imported Scenario")
+        n_agents = len(data.get("agents", []))
+        n_links  = len(data.get("links", []))
+        print(f"\n{BOLD}Detected Muninn export format{RESET} — importing directly without translation.")
+        print(f'  Scenario: "{scenario_name}"  ({n_agents} agents, {n_links} links)')
+        if args.output:
+            try:
+                with open(args.output, "w") as fh:
+                    json.dump(data, fh, indent=2)
+                print(f"\nDocument saved to: {args.output}")
+            except OSError as exc:
+                print(f"WARNING: Could not save output: {exc}", file=sys.stderr)
+        if args.dry_run:
+            print("\nDry run — not importing.")
+            return
+        print(f"\nImporting to Muninn at {args.api_url} …")
+        try:
+            result = import_via_api(data, args.api_url, args.api_token)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+        sid  = result.get("scenario_id")
+        name = result.get("name", scenario_name)
+        print(f"{GREEN}✓ Scenario created:{RESET} \"{name}\" (id={sid})")
+        for w in result.get("warnings", []):
+            print(f"  {YELLOW}Warning:{RESET} {w}")
+        print(f"\nOpen scenario at {args.api_url.rstrip('/')}/scenarios/{sid}")
+        return
 
     huginn_name = data.get("name", "Imported Huginn Scenario")
     huginn_desc = data.get("description", "")

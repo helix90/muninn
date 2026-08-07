@@ -526,6 +526,36 @@ class TestRoundTrip:
 
         assert link_names(original_doc) == link_names(reimported_doc)
 
+    def test_cross_user_import(self, app, test_user, test_user2, scenario, agents_and_links):
+        """Any user can import a scenario exported by a different user.
+
+        The resulting scenario and agents must be owned by the *importing* user,
+        not the original exporter.
+        """
+        # Export as test_user (scenario owner)
+        with app.app_context():
+            s = db.session.get(Scenario, scenario.id)
+            doc = export_scenario(s)
+
+        assert doc['exported_by'] == test_user.username
+
+        # Import as test_user2 (completely different user)
+        with app.app_context():
+            imported, warnings = import_scenario(doc, test_user2.id)
+
+            # Scenario owned by the importer
+            assert imported.user_id == test_user2.id
+            assert imported.user_id != test_user.id
+
+            # All agents owned by the importer
+            jobs = db.session.query(Job).filter_by(scenario_id=imported.id).all()
+            assert len(jobs) == 3
+            assert all(j.user_id == test_user2.id for j in jobs)
+
+            # Original scenario still owned by test_user
+            original = db.session.get(Scenario, scenario.id)
+            assert original.user_id == test_user.id
+
 
 # ---------------------------------------------------------------------------
 # HTTP routes
@@ -679,3 +709,31 @@ class TestImportRoute:
         )
         assert response.status_code == 200
         assert b'not_a_real_agent' in response.data or b'Unknown' in response.data
+
+    def test_import_cross_user_via_route(self, auth_client2, app, test_user2, scenario, agents_and_links):
+        """User B can import a scenario originally created by User A via the HTTP route.
+
+        The resulting scenario must be owned by User B (the importer).
+        Note: we construct the export doc directly to avoid g._login_user leaking
+        between two different clients within the same test.
+        """
+        with app.app_context():
+            s = db.session.get(Scenario, scenario.id)
+            doc = export_scenario(s)
+
+        response = auth_client2.post(
+            '/scenarios/import',
+            data=self._make_upload(doc),
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert '/scenarios/' in response.location
+
+        with app.app_context():
+            imported = db.session.query(Scenario).filter_by(
+                user_id=test_user2.id,
+                name=scenario.name,
+            ).first()
+        assert imported is not None
+        assert imported.user_id == test_user2.id

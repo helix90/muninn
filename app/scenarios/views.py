@@ -1,9 +1,9 @@
 """Views for scenario management"""
 import json
 
-from flask import render_template, request, redirect, url_for, flash, jsonify, Response
+from flask import render_template, request, redirect, url_for, flash, jsonify, Response, current_app
 from flask_login import login_required, current_user
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from app.scenarios import scenarios_bp
 from app.scenarios.export_import import (
     ImportValidationError,
@@ -276,7 +276,7 @@ def import_scenario_view():
             'error',
         )
         return render_template('scenarios/import.html')
-    except OperationalError as exc:
+    except (OperationalError, ProgrammingError) as exc:
         db.session.rollback()
         logger.error(f"Scenario import database error: {exc}")
         flash(
@@ -287,8 +287,9 @@ def import_scenario_view():
         return render_template('scenarios/import.html')
     except Exception as exc:
         db.session.rollback()
-        logger.error(f"Scenario import failed: {exc}")
-        flash('Import failed due to an unexpected error. No data was saved.', 'error')
+        logger.error(f"Scenario import failed: {type(exc).__name__}: {exc}")
+        detail = f' ({type(exc).__name__}: {exc})' if current_app.debug else ''
+        flash(f'Import failed due to an unexpected error. No data was saved.{detail}', 'error')
         return render_template('scenarios/import.html')
 
     agent_count = len(doc['agents'])

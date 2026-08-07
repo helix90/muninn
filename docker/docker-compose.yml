@@ -25,7 +25,9 @@ services:
       # Bind-mount for live reloading in development.
       # Remove when deploying from a pre-built image in production.
       - ..:/app
-      - ../logs:/app/logs
+      # Named volume for logs so Docker manages ownership (avoids bind-mount
+      # permission errors where the host directory is owned by root).
+      - logs_data:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+  logs_data:

@@ -1,16 +1,12 @@
-# Use Python 3.11 slim image for production
 FROM python:3.11-slim
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_ENV=production
 ENV FLASK_APP=run.py
 
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
@@ -19,31 +15,27 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
 COPY . .
 
-# Create non-root user for security
+# All root-level setup in one layer: create user, set ownership,
+# make logs dir, write and chmod the entrypoint script.
 RUN adduser --disabled-password --gecos '' appuser \
-    && chown -R appuser:appuser /app
-USER appuser
+    && mkdir -p /app/logs \
+    && chown -R appuser:appuser /app \
+    && printf '#!/bin/sh\nset -e\necho "Running database migrations..."\nflask db upgrade\necho "Starting Muninn..."\nexec "$@"\n' \
+        > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
 
-# Create logs directory
-RUN mkdir -p logs
-
-# Expose port
 EXPOSE 5000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Entrypoint runs migrations then starts the app
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Switch to non-root for runtime only — all RUN steps above are root.
+USER appuser
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "run.py"] 
+CMD ["python", "run.py"]

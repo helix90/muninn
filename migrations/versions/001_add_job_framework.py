@@ -44,7 +44,7 @@ def upgrade():
     op.create_table('jobs',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('job_type', sa.Enum('web_scraper', 'rss_reader', 'filter', 'email_sender', name='job_type_enum'), nullable=False),
+        sa.Column('job_type', sa.Enum('web_scraper', 'rss_reader', 'filter', 'email_sender', name='job_type_enum', create_type=False), nullable=False),
         sa.Column('config', postgresql.JSONB(), nullable=False, default={}),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('is_active', sa.Boolean(), default=True, nullable=False),

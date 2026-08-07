@@ -16,16 +16,18 @@ branch_labels = None
 depends_on = None
 
 
+_job_type_enum = postgresql.ENUM(
+    'web_scraper', 'rss_reader', 'filter', 'email_sender',
+    name='job_type_enum',
+    create_type=False,  # we call .create() ourselves; prevents op.create_table double-emitting
+)
+
+
 def upgrade():
-    # Create job_type enum
-    op.execute("""
-        DO $$ BEGIN
-            CREATE TYPE job_type_enum AS ENUM ('web_scraper', 'rss_reader', 'filter', 'email_sender');
-        EXCEPTION
-            WHEN duplicate_object THEN NULL;
-        END $$;
-    """)
-    
+    # Create enum only if absent — postgresql.ENUM.create(checkfirst=True) uses
+    # dialect.has_type() so it works reliably even if a previous run failed partway.
+    _job_type_enum.create(op.get_bind(), checkfirst=True)
+
     # Create users table
     op.create_table('users',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -44,7 +46,7 @@ def upgrade():
     op.create_table('jobs',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('job_type', sa.Enum('web_scraper', 'rss_reader', 'filter', 'email_sender', name='job_type_enum', create_type=False), nullable=False),
+        sa.Column('job_type', _job_type_enum, nullable=False),
         sa.Column('config', postgresql.JSONB(), nullable=False, default={}),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('is_active', sa.Boolean(), default=True, nullable=False),

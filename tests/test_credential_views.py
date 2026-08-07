@@ -1,9 +1,13 @@
 """Tests for credential views (web UI)"""
+import io
+import json
+
 import pytest
 from flask import url_for
+
+from app.extensions import db
 from app.models import Credential
 from app.services.credential_service import CredentialService
-from app.extensions import db
 
 
 class TestCredentialListView:
@@ -362,6 +366,204 @@ class TestCredentialDeleteView:
             credential = service.get_credential(test_user.id, 'user1_key')
 
             assert credential is not None
+
+
+class TestCredentialExportView:
+    """Test credential export endpoint"""
+
+    def test_export_requires_login(self, client):
+        response = client.get('/credentials/export')
+        assert response.status_code == 302
+        assert 'login' in response.location.lower()
+
+    def test_export_returns_json_file(self, client, auth_client, test_user, app):
+        with app.app_context():
+            service = CredentialService()
+            service.create_credential(test_user.id, 'api_key', 'supersecret', 'My API key')
+            service.create_credential(test_user.id, 'db_pass', 'hunter2')
+
+        response = auth_client.get('/credentials/export')
+
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        assert 'attachment' in response.headers.get('Content-Disposition', '')
+        assert '.json' in response.headers.get('Content-Disposition', '')
+
+        data = json.loads(response.data)
+        assert data['schema_version'] == 1
+        assert 'exported_at' in data
+        assert isinstance(data['credentials'], list)
+        assert len(data['credentials']) == 2
+
+        by_name = {c['name']: c for c in data['credentials']}
+        assert by_name['api_key']['value'] == 'supersecret'
+        assert by_name['api_key']['description'] == 'My API key'
+        assert by_name['db_pass']['value'] == 'hunter2'
+
+    def test_export_empty_credential_list(self, client, auth_client):
+        response = auth_client.get('/credentials/export')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['credentials'] == []
+
+    def test_export_only_own_credentials(self, client, auth_client, test_user, test_user2, app):
+        with app.app_context():
+            service = CredentialService()
+            service.create_credential(test_user.id, 'mine', 'myvalue')
+            service.create_credential(test_user2.id, 'theirs', 'theirvalue')
+
+        response = auth_client.get('/credentials/export')
+
+        data = json.loads(response.data)
+        names = [c['name'] for c in data['credentials']]
+        assert 'mine' in names
+        assert 'theirs' not in names
+
+
+class TestCredentialImportView:
+    """Test credential import endpoint"""
+
+    def _make_upload(self, credentials, schema_version=1):
+        payload = {
+            'schema_version': schema_version,
+            'exported_at': '2026-08-07T00:00:00Z',
+            'credentials': credentials,
+        }
+        return (io.BytesIO(json.dumps(payload).encode()), 'creds.json')
+
+    def test_import_get_requires_login(self, client):
+        response = client.get('/credentials/import')
+        assert response.status_code == 302
+        assert 'login' in response.location.lower()
+
+    def test_import_post_requires_login(self, client):
+        response = client.post('/credentials/import', data={
+            'file': self._make_upload([]),
+        })
+        assert response.status_code == 302
+        assert 'login' in response.location.lower()
+
+    def test_import_get_shows_form(self, client, auth_client):
+        response = auth_client.get('/credentials/import')
+        assert response.status_code == 200
+        assert b'import' in response.data.lower()
+        assert b'file' in response.data.lower()
+
+    def test_import_creates_credentials(self, client, auth_client, test_user, app):
+        upload = self._make_upload([
+            {'name': 'new_key', 'value': 'abc123', 'description': 'A key'},
+            {'name': 'another', 'value': 'xyz789', 'description': ''},
+        ])
+
+        response = auth_client.post('/credentials/import', data={
+            'file': upload,
+        }, content_type='multipart/form-data', follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b'imported' in response.data.lower()
+
+        with app.app_context():
+            service = CredentialService()
+            cred = service.get_credential(test_user.id, 'new_key')
+            assert cred is not None
+            assert service.get_decrypted_value(cred) == 'abc123'
+            assert cred.description == 'A key'
+
+            cred2 = service.get_credential(test_user.id, 'another')
+            assert cred2 is not None
+            assert service.get_decrypted_value(cred2) == 'xyz789'
+
+    def test_import_skips_duplicates(self, client, auth_client, test_user, app):
+        with app.app_context():
+            service = CredentialService()
+            service.create_credential(test_user.id, 'existing', 'original_value')
+
+        upload = self._make_upload([
+            {'name': 'existing', 'value': 'new_value'},
+            {'name': 'fresh', 'value': 'brand_new'},
+        ])
+
+        response = auth_client.post('/credentials/import', data={
+            'file': upload,
+        }, content_type='multipart/form-data', follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b'skipped' in response.data.lower()
+
+        # Original value must be unchanged
+        with app.app_context():
+            service = CredentialService()
+            cred = service.get_credential(test_user.id, 'existing')
+            assert service.get_decrypted_value(cred) == 'original_value'
+
+            fresh = service.get_credential(test_user.id, 'fresh')
+            assert fresh is not None
+
+    def test_import_no_file_selected(self, client, auth_client):
+        response = auth_client.post('/credentials/import', data={},
+                                    content_type='multipart/form-data',
+                                    follow_redirects=True)
+        assert response.status_code == 200
+        assert b'select' in response.data.lower() or b'file' in response.data.lower()
+
+    def test_import_invalid_json(self, client, auth_client):
+        bad_file = (io.BytesIO(b'not json at all'), 'creds.json')
+        response = auth_client.post('/credentials/import', data={'file': bad_file},
+                                    content_type='multipart/form-data',
+                                    follow_redirects=True)
+        assert response.status_code == 200
+        assert b'json' in response.data.lower()
+
+    def test_import_missing_credentials_key(self, client, auth_client):
+        bad_payload = (io.BytesIO(json.dumps({'schema_version': 1}).encode()), 'creds.json')
+        response = auth_client.post('/credentials/import', data={'file': bad_payload},
+                                    content_type='multipart/form-data',
+                                    follow_redirects=True)
+        assert response.status_code == 200
+        assert b'invalid' in response.data.lower() or b'missing' in response.data.lower()
+
+    def test_import_skips_entries_with_invalid_name(self, client, auth_client, test_user, app):
+        upload = self._make_upload([
+            {'name': 'valid_key', 'value': 'good'},
+            {'name': 'bad name!', 'value': 'ignored'},
+        ])
+
+        response = auth_client.post('/credentials/import', data={'file': upload},
+                                    content_type='multipart/form-data',
+                                    follow_redirects=True)
+        assert response.status_code == 200
+
+        with app.app_context():
+            service = CredentialService()
+            assert service.get_credential(test_user.id, 'valid_key') is not None
+            assert service.get_credential(test_user.id, 'bad name!') is None
+
+    def test_roundtrip_export_then_import(self, client, auth_client2, test_user2, app):
+        """Export JSON format round-trips correctly through import."""
+        # Build export payload directly (avoids g._login_user cross-request leak)
+        # to keep this a single-client, single-request test.
+        payload = {
+            'schema_version': 1,
+            'exported_at': '2026-08-07T00:00:00Z',
+            'credentials': [
+                {'name': 'roundtrip_key', 'value': 'roundtrip_value', 'description': 'RT'},
+            ],
+        }
+        upload = (io.BytesIO(json.dumps(payload).encode()), 'creds.json')
+
+        import_resp = auth_client2.post('/credentials/import', data={'file': upload},
+                                        content_type='multipart/form-data',
+                                        follow_redirects=True)
+        assert import_resp.status_code == 200
+        assert b'imported' in import_resp.data.lower()
+
+        with app.app_context():
+            service = CredentialService()
+            cred = service.get_credential(test_user2.id, 'roundtrip_key')
+            assert cred is not None
+            assert service.get_decrypted_value(cred) == 'roundtrip_value'
+            assert cred.description == 'RT'
 
 
 class TestCredentialIntegration:

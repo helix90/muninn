@@ -26,44 +26,21 @@ def upgrade():
     """Delete all data associated with old job types."""
     conn = op.get_bind()
 
-    # First, delete job_runs for old jobs
-    conn.execute(
-        sa.text("""
-            DELETE FROM job_runs
-            WHERE job_id IN (
-                SELECT id FROM jobs
-                WHERE job_type IN :job_types
-            )
-        """),
-        {"job_types": tuple(OLD_JOB_TYPES)}
-    )
+    # Cast enum to text for IN comparison.  The job_chains table in this
+    # schema does not have parent_job_id/child_job_id columns so that
+    # cleanup is intentionally omitted.
 
-    # Then delete job_chains for old jobs
-    conn.execute(
-        sa.text("""
-            DELETE FROM job_chains
-            WHERE parent_job_id IN (
-                SELECT id FROM jobs
-                WHERE job_type IN :job_types
-            ) OR child_job_id IN (
-                SELECT id FROM jobs
-                WHERE job_type IN :job_types
-            )
-        """),
-        {"job_types": tuple(OLD_JOB_TYPES)}
-    )
+    conn.execute(sa.text("""
+        DELETE FROM job_runs
+        WHERE job_id IN (
+            SELECT id FROM jobs WHERE job_type::text IN ('web_scraper', 'rss_reader', 'filter', 'email_sender')
+        )
+    """))
 
-    # Finally, delete old jobs
-    conn.execute(
-        sa.text("""
-            DELETE FROM jobs
-            WHERE job_type IN :job_types
-        """),
-        {"job_types": tuple(OLD_JOB_TYPES)}
-    )
-
-    # Log the cleanup
-    print(f"Removed jobs with types: {', '.join(OLD_JOB_TYPES)}")
+    conn.execute(sa.text("""
+        DELETE FROM jobs
+        WHERE job_type::text IN ('web_scraper', 'rss_reader', 'filter', 'email_sender')
+    """))
 
 
 def downgrade():

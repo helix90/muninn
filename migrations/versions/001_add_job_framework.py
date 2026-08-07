@@ -52,13 +52,6 @@ def upgrade():
         sa.Column('is_active', sa.Boolean(), default=True, nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('tags', postgresql.JSONB(), nullable=True),
-        sa.Column('priority', sa.Integer(), default=0, nullable=False),
-        sa.Column('schedule_cron', sa.String(100), nullable=True),
-        sa.Column('schedule_enabled', sa.Boolean(), default=False, nullable=False),
-        sa.Column('last_scheduled_run', sa.DateTime(), nullable=True),
-        sa.Column('next_scheduled_run', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )

@@ -18,7 +18,13 @@ depends_on = None
 
 def upgrade():
     # Create job_type enum
-    op.execute("CREATE TYPE IF NOT EXISTS job_type_enum AS ENUM ('web_scraper', 'rss_reader', 'filter', 'email_sender')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE job_type_enum AS ENUM ('web_scraper', 'rss_reader', 'filter', 'email_sender');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
     
     # Create users table
     op.create_table('users',

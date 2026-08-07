@@ -48,8 +48,16 @@ def init_extensions(app):
 
         @login_manager.user_loader
         def load_user(user_id):
-            """Load user by ID for Flask-Login."""
-            return db.session.query(User).get(int(user_id))
+            """Load user by ID for Flask-Login.
+
+            Use filter().first() rather than .get() so we always hit the
+            database instead of returning a potentially stale identity-map
+            entry.  This matters after a DB reset where the session cookie
+            still references a deleted user — .get() can return the old
+            in-memory object, bypassing @login_required, and causing FK
+            violations downstream.
+            """
+            return db.session.query(User).filter(User.id == int(user_id)).first()
 
         app.logger.info("User loader registered successfully")
     except Exception as e:

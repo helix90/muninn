@@ -3,7 +3,7 @@ import json
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, Response
 from flask_login import login_required, current_user
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from app.scenarios import scenarios_bp
 from app.scenarios.export_import import (
     ImportValidationError,
@@ -267,6 +267,24 @@ def import_scenario_view():
 
     try:
         scenario, warnings = import_scenario(doc, current_user.id)
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.error(f"Scenario import integrity error: {exc}")
+        flash(
+            'Import failed: database integrity error. '
+            'If you recently reset the database, please log out and register again.',
+            'error',
+        )
+        return render_template('scenarios/import.html')
+    except OperationalError as exc:
+        db.session.rollback()
+        logger.error(f"Scenario import database error: {exc}")
+        flash(
+            'Import failed: database error — the schema on this instance may be '
+            'out of date. Run "flask db upgrade" and try again.',
+            'error',
+        )
+        return render_template('scenarios/import.html')
     except Exception as exc:
         db.session.rollback()
         logger.error(f"Scenario import failed: {exc}")

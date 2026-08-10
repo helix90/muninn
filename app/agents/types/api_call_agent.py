@@ -7,9 +7,14 @@ This agent can make HTTP requests to any RESTful API with support for all HTTP m
 
 import json
 import logging
+import re
 import requests
 from typing import Any, Dict, List, Optional
 from jinja2 import Environment, BaseLoader, TemplateError
+
+# Matches {{credential:name}} placeholders — not valid Jinja2, so they must
+# be substituted with a dummy before Jinja2 syntax validation.
+_CREDENTIAL_RE = re.compile(r'\{\{credential:[a-zA-Z0-9_.\-]+\}\}')
 
 from app.agents.base import SourceAgent
 from app.agents.registry import register_agent
@@ -102,18 +107,24 @@ class APICallAgent(SourceAgent):
         if self.payload_template and self.method in ['GET', 'HEAD', 'OPTIONS']:
             raise ValueError(f"{self.method} requests cannot have a payload")
 
-        # Validate URL template syntax
+        # Validate URL template syntax.
+        # Credential placeholders ({{credential:name}}) are resolved before
+        # the agent runs, but at validation time they are still raw strings.
+        # Substitute them with a harmless literal so Jinja2 can check the
+        # surrounding template syntax without choking on the colon.
+        url_for_validation = _CREDENTIAL_RE.sub('CREDENTIAL', self.url)
         try:
             env = Environment(loader=BaseLoader())
-            env.from_string(self.url)
+            env.from_string(url_for_validation)
         except TemplateError as e:
             raise ValueError(f"Invalid URL template: {str(e)}")
 
         # Validate payload template syntax if present
         if self.payload_template:
+            payload_for_validation = _CREDENTIAL_RE.sub('CREDENTIAL', self.payload_template)
             try:
                 env = Environment(loader=BaseLoader())
-                env.from_string(self.payload_template)
+                env.from_string(payload_for_validation)
             except TemplateError as e:
                 raise ValueError(f"Invalid payload template: {str(e)}")
 

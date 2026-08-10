@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "exported_at": "2026-08-10T00:00:00+00:00",
+  "exported_by": "muninn",
+  "scenario": {
+    "name": "AirNow AQI Daily Report",
+    "description": "Fetches current air quality observations from AirNow once daily and formats a structured AQI report. Requires credentials: airnow_api_key, home_latitude, home_longitude (shared with Pirate Weather if already set).",
+    "color": "#065F46",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Fetch AirNow Current AQI",
+      "job_type": "api_call_agent",
+      "description": "Calls the AirNow observation API for the configured location. Free API key at airnowapi.org. Reuses home_latitude and home_longitude credentials from Pirate Weather if already created. distance=25 searches within 25 miles.",
+      "config": {
+        "url": "https://www.airnowapi.org/aq/observation/latLong/current/",
+        "method": "GET",
+        "query_params": {
+          "format": "application/json",
+          "latitude": "{{credential:home_latitude}}",
+          "longitude": "{{credential:home_longitude}}",
+          "distance": "25",
+          "API_KEY": "{{credential:airnow_api_key}}"
+        },
+        "timeout": 30,
+        "verify_ssl": true
+      },
+      "schedule_cron": "0 8 * * *",
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": ["air-quality", "airnow", "source"]
+    },
+    {
+      "export_id": 1,
+      "name": "Format AQI Report",
+      "job_type": "template_agent",
+      "description": "Formats the AirNow array response into a structured event. AQI categories: 0-50 Good, 51-100 Moderate, 101-150 Unhealthy for Sensitive Groups, 151-200 Unhealthy, 201-300 Very Unhealthy, 301+ Hazardous. Note: AirNow DateObserved has a trailing space — the trim filter handles it.",
+      "config": {
+        "templates": {
+          "reporting_area": "{{ response_json[0].ReportingArea }}, {{ response_json[0].StateCode }}",
+          "observed_at": "{{ response_json[0].DateObserved | trim }} {{ response_json[0].HourObserved }}:00 {{ response_json[0].LocalTimeZone }}",
+          "overall_aqi": "{%- set ns = namespace(aqi=0, cat=\"\") -%}{%- for obs in response_json -%}{%- if obs.AQI > ns.aqi -%}{%- set ns.aqi = obs.AQI -%}{%- set ns.cat = obs.Category.Name -%}{%- endif -%}{%- endfor -%}{{ ns.aqi }}",
+          "overall_category": "{%- set ns = namespace(aqi=0, cat=\"\") -%}{%- for obs in response_json -%}{%- if obs.AQI > ns.aqi -%}{%- set ns.aqi = obs.AQI -%}{%- set ns.cat = obs.Category.Name -%}{%- endif -%}{%- endfor -%}{{ ns.cat }}",
+          "pollutants": "{%- for obs in response_json -%}{{ obs.ParameterName }}: {{ obs.AQI }} ({{ obs.Category.Name }}){% if not loop.last %}, {% endif %}{%- endfor -%}",
+          "pm25_aqi": "{%- set ns = namespace(v=\"N/A\") -%}{%- for obs in response_json -%}{%- if obs.ParameterName == \"PM2.5\" -%}{%- set ns.v = obs.AQI | string -%}{%- endif -%}{%- endfor -%}{{ ns.v }}",
+          "o3_aqi": "{%- set ns = namespace(v=\"N/A\") -%}{%- for obs in response_json -%}{%- if obs.ParameterName == \"O3\" -%}{%- set ns.v = obs.AQI | string -%}{%- endif -%}{%- endfor -%}{{ ns.v }}",
+          "health_guidance": "{%- set ns = namespace(aqi=0) -%}{%- for obs in response_json -%}{%- if obs.AQI > ns.aqi -%}{%- set ns.aqi = obs.AQI -%}{%- endif -%}{%- endfor -%}{%- set a = ns.aqi -%}{%- if a <= 50 -%}Air quality is good. No precautions needed.{%- elif a <= 100 -%}Unusually sensitive people should consider reducing prolonged outdoor exertion.{%- elif a <= 150 -%}Sensitive groups should reduce prolonged outdoor exertion. Others are unlikely to be affected.{%- elif a <= 200 -%}Everyone should reduce prolonged outdoor exertion. Sensitive groups should avoid outdoor activity.{%- elif a <= 300 -%}Everyone should avoid prolonged outdoor exertion. Sensitive groups should remain indoors.{%- else -%}Everyone should avoid all outdoor exertion. Sensitive groups should remain indoors.{%- endif -%}"
+        },
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": ["air-quality", "formatter", "transform"]
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1}
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "exported_at": "2026-08-10T00:00:00+00:00",
+  "exported_by": "muninn",
+  "scenario": {
+    "name": "Pirate Weather Daily Report",
+    "description": "Fetches today's forecast from Pirate Weather once daily and formats a structured report with high/low temps, precipitation chance, moon phase, and local sunrise/sunset. Requires three credentials: pirate_weather_api_key, home_latitude, home_longitude.",
+    "color": "#1E3A8A",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Fetch Pirate Weather",
+      "job_type": "api_call_agent",
+      "description": "Calls api.pirateweather.net once daily. Set credentials pirate_weather_api_key, home_latitude, home_longitude before enabling. Change 'units' to 'si' for Celsius/km.",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/{{credential:home_latitude}},{{credential:home_longitude}}",
+        "method": "GET",
+        "query_params": {
+          "units": "us",
+          "exclude": "minutely,hourly,alerts,flags"
+        },
+        "timeout": 30,
+        "verify_ssl": true
+      },
+      "schedule_cron": "0 6 * * *",
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": ["weather", "pirate-weather", "source"]
+    },
+    {
+      "export_id": 1,
+      "name": "Format Weather Report",
+      "job_type": "template_agent",
+      "description": "Extracts forecast fields from the Pirate Weather API response. Outputs: temp_high, temp_low (°F), precip_chance (0-100), moon_phase (English), sunrise_local, sunset_local (12-hour local time), timezone, summary.",
+      "config": {
+        "templates": {
+          "temp_high": "{{ response_json.daily.data[0].temperatureHigh | round(1) }}",
+          "temp_low": "{{ response_json.daily.data[0].temperatureLow | round(1) }}",
+          "precip_chance": "{{ (response_json.daily.data[0].precipProbability * 100) | round | int }}",
+          "moon_phase": "{%- set p = response_json.daily.data[0].moonPhase -%}{%- if p < 0.03 or p > 0.97 -%}New Moon{%- elif p < 0.22 -%}Waxing Crescent{%- elif p < 0.28 -%}First Quarter{%- elif p < 0.47 -%}Waxing Gibbous{%- elif p < 0.53 -%}Full Moon{%- elif p < 0.72 -%}Waning Gibbous{%- elif p < 0.78 -%}Last Quarter{%- else -%}Waning Crescent{%- endif -%}",
+          "sunrise_local": "{%- set os = (response_json.offset * 3600) | int -%}{%- set ts = response_json.daily.data[0].sunriseTime + os -%}{%- set h = ((ts % 86400) // 3600) | int -%}{%- set m = ((ts % 3600) // 60) | int -%}{%- if h == 0 -%}12:{{ m if m >= 10 else '0' ~ m }} AM{%- elif h < 12 -%}{{ h }}:{{ m if m >= 10 else '0' ~ m }} AM{%- elif h == 12 -%}12:{{ m if m >= 10 else '0' ~ m }} PM{%- else -%}{{ h - 12 }}:{{ m if m >= 10 else '0' ~ m }} PM{%- endif -%}",
+          "sunset_local": "{%- set os = (response_json.offset * 3600) | int -%}{%- set ts = response_json.daily.data[0].sunsetTime + os -%}{%- set h = ((ts % 86400) // 3600) | int -%}{%- set m = ((ts % 3600) // 60) | int -%}{%- if h == 0 -%}12:{{ m if m >= 10 else '0' ~ m }} AM{%- elif h < 12 -%}{{ h }}:{{ m if m >= 10 else '0' ~ m }} AM{%- elif h == 12 -%}12:{{ m if m >= 10 else '0' ~ m }} PM{%- else -%}{{ h - 12 }}:{{ m if m >= 10 else '0' ~ m }} PM{%- endif -%}",
+          "timezone": "{{ response_json.timezone }}",
+          "summary": "{{ response_json.daily.data[0].summary }}"
+        },
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": ["weather", "formatter", "transform"]
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 1}
+  ]
+}

@@ -21,6 +21,10 @@ Transform Agents:
 - CSVParserAgent: Parse CSV content from event payloads
 - RouterAgent: Tag events with a route label for conditional branching
 - DelayAgent: Buffer events and release them after a configurable delay
+- TopicExtractAgent: Naive keyword/phrase extraction from event text
+- FrequencyTrackerAgent: Track topic mention frequency/persistence over time
+- HypeTermAgent: Build a trending-term snapshot from a noise-reference feed
+- SignalScoreAgent: Score candidate topics as quiet-signal vs. hype/one-off
 
 Action Agents:
 - EmailAgent: Send via SMTP
@@ -55,6 +59,10 @@ from app.agents.types.aggregation_agent import AggregationAgent
 from app.agents.types.csv_parser_agent import CSVParserAgent
 from app.agents.types.router_agent import RouterAgent
 from app.agents.types.delay_agent import DelayAgent
+from app.agents.types.topic_extract_agent import TopicExtractAgent
+from app.agents.types.frequency_tracker_agent import FrequencyTrackerAgent
+from app.agents.types.hype_term_agent import HypeTermAgent
+from app.agents.types.signal_score_agent import SignalScoreAgent
 
 # Import action agents
 from app.agents.types.email_agent import EmailAgent
@@ -88,6 +96,10 @@ __all__ = [
     'CSVParserAgent',
     'RouterAgent',
     'DelayAgent',
+    'TopicExtractAgent',
+    'FrequencyTrackerAgent',
+    'HypeTermAgent',
+    'SignalScoreAgent',
     # Action agents
     'EmailAgent',
     'HTTPPostAgent',

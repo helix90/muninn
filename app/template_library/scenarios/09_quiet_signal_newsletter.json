@@ -1,0 +1,185 @@
+{
+  "_template_meta": {
+    "display_name": "Quiet Signal Newsletter",
+    "description": "Finds persistent-but-quiet topics being drowned out by hype/marketing noise, and emails a weekly digest.",
+    "tags": ["rss", "custom-agents", "digest", "email", "nlp"],
+    "difficulty": "advanced",
+    "required_credentials": []
+  },
+  "schema_version": 1,
+  "scenario": {
+    "name": "Quiet Signal Newsletter",
+    "description": "Finds persistent-but-quiet topics being drowned out by hype/marketing noise, and emails a weekly digest.",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "RSS Source - Niche Blog",
+      "job_type": "rss_agent",
+      "description": "Placeholder feed - replace with a real niche/specialist blog.",
+      "config": {"feed_url": "https://example-niche-blog.com/feed", "max_entries": 30, "days_back": 7},
+      "schedule_cron": "*/30 * * * *", "schedule_enabled": true,
+      "is_active": true, "priority": 0, "tags": ["source", "signal"]
+    },
+    {
+      "export_id": 1,
+      "name": "RSS Source - arXiv (cs)",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {"feed_url": "http://export.arxiv.org/rss/cs", "max_entries": 50, "days_back": 7},
+      "schedule_cron": "0 * * * *", "schedule_enabled": true,
+      "is_active": true, "priority": 0, "tags": ["source", "signal"]
+    },
+    {
+      "export_id": 2,
+      "name": "RSS Source - lobste.rs newest",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {"feed_url": "https://lobste.rs/newest.rss", "max_entries": 40, "days_back": 7},
+      "schedule_cron": "*/30 * * * *", "schedule_enabled": true,
+      "is_active": true, "priority": 0, "tags": ["source", "signal"]
+    },
+    {
+      "export_id": 3,
+      "name": "RSS Source - HN /newest",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {"feed_url": "https://hnrss.org/newest", "max_entries": 50, "days_back": 7},
+      "schedule_cron": "*/30 * * * *", "schedule_enabled": true,
+      "is_active": true, "priority": 0, "tags": ["source", "signal"]
+    },
+    {
+      "export_id": 4,
+      "name": "RSS Source - HN Front Page (noise baseline)",
+      "job_type": "rss_agent",
+      "description": "Feeds HypeTermAgent only - not part of the candidate/signal chain.",
+      "config": {"feed_url": "https://hnrss.org/frontpage", "max_entries": 30, "days_back": 2},
+      "schedule_cron": "0 * * * *", "schedule_enabled": true,
+      "is_active": true, "priority": 0, "tags": ["source", "noise-reference"]
+    },
+    {
+      "export_id": 5,
+      "name": "Filter - Strip Obvious Boilerplate",
+      "job_type": "filter_agent",
+      "description": "Cheap pre-filter before the more expensive topic/frequency stages.",
+      "config": {
+        "match_all": true,
+        "rules": [
+          {"field": "title", "type": "not_contains", "value": "sponsored", "case_sensitive": false},
+          {"field": "title", "type": "not_contains", "value": "revolutionary", "case_sensitive": false},
+          {"field": "title", "type": "regex", "value": "^(?!.*\\b(funding round|acquires|layoffs)\\b).*$", "case_sensitive": false}
+        ]
+      },
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["filter"]
+    },
+    {
+      "export_id": 6,
+      "name": "Deduplicate Across Feeds",
+      "job_type": "deduplication_agent",
+      "description": "Catches the same story appearing on more than one source feed.",
+      "config": {"uniqueness_fields": ["link"], "lookback_days": 14},
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["dedupe"]
+    },
+    {
+      "export_id": 7,
+      "name": "Topic Extract",
+      "job_type": "topic_extract_agent",
+      "description": "Custom agent - naive keyword/phrase extraction, no ML.",
+      "config": {"source_fields": ["title", "summary"], "max_topics_per_item": 5, "min_term_length": 4},
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["custom", "topic"]
+    },
+    {
+      "export_id": 8,
+      "name": "Frequency Tracker",
+      "job_type": "frequency_tracker_agent",
+      "description": "Custom agent - clusters articles via shared phrases and tracks mentions over time.",
+      "config": {"window_days": 14, "max_records_per_topic": 200},
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["custom", "frequency"]
+    },
+    {
+      "export_id": 9,
+      "name": "Hype Term Tracker",
+      "job_type": "hype_term_agent",
+      "description": "Custom agent - builds this run's hype/trending term snapshot from the noise baseline feed.",
+      "config": {"source_fields": ["title"], "top_n_terms": 25, "min_term_length": 4},
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["custom", "hype"]
+    },
+    {
+      "export_id": 10,
+      "name": "Signal Score",
+      "job_type": "signal_score_agent",
+      "description": "Custom agent - drops hype-overlapping or non-persistent topics, keeps quiet-but-recurring ones.",
+      "config": {
+        "max_distinct_sources_48h": 4,
+        "min_recurrences": 2,
+        "min_span_days": 10,
+        "hype_terms_max_age_hours": 6
+      },
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["custom", "scoring"]
+    },
+    {
+      "export_id": 11,
+      "name": "Weekly Digest Window",
+      "job_type": "aggregation_agent",
+      "description": "Bundles surviving items into one weekly batch.",
+      "config": {
+        "window_size": 40,
+        "window_duration_seconds": 604800,
+        "aggregation_mode": "collect_all",
+        "max_window_size": 200
+      },
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["digest"]
+    },
+    {
+      "export_id": 12,
+      "name": "Newsletter Template",
+      "job_type": "template_agent",
+      "description": "Renders the batched 'events' list. Output lands in payload['formatted'].",
+      "config": {
+        "template": "## This Week's Quiet Signals\n\n{% for item in events %}### {{ item.title }}\n{{ item.summary }}\n_{{ item.signal_reason }}_\n[Read more]({{ item.link }})\n\n{% endfor %}",
+        "output_field": "formatted",
+        "preserve_original": true
+      },
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["template"]
+    },
+    {
+      "export_id": 13,
+      "name": "Send Newsletter",
+      "job_type": "email_agent",
+      "description": "Global SMTP settings come from env vars.",
+      "config": {
+        "to_email": "subscribers@example.com",
+        "subject_template": "Quiet Signals",
+        "body_template": "{{ formatted }}",
+        "html": false
+      },
+      "schedule_cron": null, "schedule_enabled": false,
+      "is_active": true, "priority": 0, "tags": ["action", "email"]
+    }
+  ],
+  "links": [
+    {"source": 0, "target": 5},
+    {"source": 1, "target": 5},
+    {"source": 2, "target": 5},
+    {"source": 3, "target": 5},
+    {"source": 5, "target": 6},
+    {"source": 6, "target": 7},
+    {"source": 7, "target": 8},
+    {"source": 4, "target": 9},
+    {"source": 8, "target": 10},
+    {"source": 9, "target": 10},
+    {"source": 10, "target": 11},
+    {"source": 11, "target": 12},
+    {"source": 12, "target": 13}
+  ]
+}

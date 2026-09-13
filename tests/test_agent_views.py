@@ -748,6 +748,53 @@ class TestAgentTemplateRegression:
         # Verify the schema endpoint is referenced
         assert '/agents/api/schema/' in content
 
+    def test_agent_list_pagination_footer_renders_past_first_page(
+        self, authenticated_client, db_session, test_user
+    ):
+        """
+        Regression test: the agent list page's pagination footer
+        ("Showing X to Y of Z results") called the bare Python builtin
+        min() as a Jinja expression -- {{ min(pagination.page *
+        pagination.per_page, pagination.total) }} -- but Jinja does not
+        expose Python builtins like min()/max() by default, raising
+        'min' is undefined.
+
+        This only executes once {% if pagination.pages > 1 %}, i.e. once a
+        user has more agents than one page's worth (per_page defaults to
+        20), so it went unnoticed until importing a multi-agent scenario
+        pushed a real account over that threshold -- at which point
+        agent_list()'s render_template call raised, was caught by its
+        broad except Exception, and silently redirected to the homepage
+        with an "An error occurred while loading agents" flash, appearing
+        to the user as "I can't list agents any more."
+
+        Fixed by using Jinja's built-in `min` filter over a list literal
+        instead of calling a nonexistent global function.
+        """
+        for i in range(25):
+            agent = Job(
+                name=f'Pagination Test Agent {i}',
+                job_type='rss_agent',
+                config={'feed_url': f'https://example.com/feed{i}.xml'},
+                user_id=test_user.id,
+            )
+            db_session.add(agent)
+        db_session.commit()
+
+        response = authenticated_client.get('/agents/')
+
+        # Pre-fix, the exception handler in agent_list() redirects to '/'
+        # instead of rendering the list -- so status 200 + real content is
+        # itself part of what this test guards, not just the exact numbers.
+        assert response.status_code == 200
+
+        content = response.data.decode('utf-8')
+        assert 'An error occurred while loading agents' not in content
+        assert 'Showing' in content and 'of' in content and 'results' in content
+        assert '<span class="font-medium">1</span>' in content
+        assert '<span class="font-medium">20</span>' in content  # min(20, 25) == 20
+        assert '<span class="font-medium">25</span>' in content  # pagination.total
+
 
 class TestAgentSchedulerIntegration:
     """

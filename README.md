@@ -22,6 +22,7 @@ Named after one of Odin's ravens, Muninn ("memory") keeps watch so you don't hav
 - **Health dashboard** — per-agent health tracking, consecutive failure counts, and email alerting (`/health/`)
 - **Manual test mode** — run any agent ephemerally against a custom payload before enabling it in production
 - **Human-readable scheduler** — dropdown picker for common schedules ("Daily at 7 AM") alongside full cron expression support
+- **Huginn migration tool** — `tools/huginn_import.py` converts a Huginn scenario export to Muninn format, translating Liquid templates to Jinja2 and mapping agent types automatically
 - **APScheduler integration** — agents run on their own cron schedules with no external job queue needed
 - **Dark mode** — full light/dark theme support throughout the UI
 
@@ -167,6 +168,52 @@ Scenarios group agents into named pipelines and let you visualise the event flow
 |------|-------------|
 | `pirate_weather_report.json` | Daily forecast from Pirate Weather — high/low, precipitation, moon phase, sunrise/sunset |
 | `airnow_aqi_report.json` | Daily AQI report from AirNow — overall AQI, per-pollutant breakdown, health guidance |
+
+---
+
+## Importing from Huginn
+
+If you're migrating from [Huginn](https://github.com/huginn/huginn), use the included conversion tool to translate a Huginn scenario export into a Muninn-importable JSON file and push it directly via the REST API.
+
+```bash
+python tools/huginn_import.py my_huginn_export.json \
+    --api-url http://localhost:5000 \
+    --api-token YOUR_API_TOKEN
+
+# Preview what will be imported without writing anything
+python tools/huginn_import.py my_huginn_export.json \
+    --api-url http://localhost:5000 \
+    --api-token YOUR_API_TOKEN \
+    --dry-run --verbose
+
+# Save the translated JSON without importing (for review or manual import)
+python tools/huginn_import.py my_huginn_export.json \
+    --api-url http://localhost:5000 \
+    --api-token YOUR_API_TOKEN \
+    --output translated.json
+```
+
+Export your scenario from Huginn via `Scenarios → Export`. The tool handles Huginn's Liquid template syntax (converting it to Jinja2), schedule strings (`every_1h` → `0 * * * *`), and Huginn's agent propagation graph.
+
+**Agent mapping coverage:**
+
+| Huginn agent | Muninn equivalent | Fidelity |
+|---|---|---|
+| RssAgent | `rss_agent` | Full |
+| WebhookAgent | `webhook_agent` | Full |
+| PostAgent | `http_post_agent` | Full |
+| DeduplicationAgent | `deduplication_agent` | Full |
+| DelayAgent | `delay_agent` | Full |
+| SlackAgent | `slack_agent` | Full |
+| TelegramAgent | `telegram_agent` | Full |
+| TriggerAgent | `filter_agent` | Approximated |
+| EventFormattingAgent | `template_agent` | Approximated |
+| EmailAgent | `email_agent` | Approximated |
+| WebsiteAgent | `web_fetch_agent` + `html_parser_agent` | Approximated |
+| SchedulerAgent | schedule applied to controlled agents | Absorbed |
+| TwitterAgent, JavaScriptAgent, DataOutputAgent, EventDiffAgent | — | Skipped |
+
+Skipped agents are noted in the tool output; the rest of the scenario imports cleanly.
 
 ---
 

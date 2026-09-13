@@ -67,6 +67,20 @@ def run_agent_test(agent_model, payload_dict: Dict[str, Any], db_session) -> Dic
             'agent_category': agent_category,
         }
 
+    # For email agents, redirect all recipients to the owning user's address
+    # so test runs never accidentally email real recipients.
+    if agent_model.job_type == 'email_agent':
+        from app.models import User
+        user = db_session.get(User, agent_model.user_id)
+        if user and user.email:
+            resolved_config = dict(resolved_config)
+            resolved_config['to_email'] = user.email
+            resolved_config.pop('cc_email', None)
+            resolved_config.pop('bcc_email', None)
+            resolved_config['subject_template'] = (
+                '[TEST] ' + resolved_config.get('subject_template', '')
+            )
+
     # Isolated session — always rolled back at the end.
     # We replace commit() with flush() so that agents that call session.commit()
     # internally (e.g. MemoryManager, DataStoreWriteAgent) still work correctly

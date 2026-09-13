@@ -311,3 +311,85 @@ class TestResponseStructure:
 
 
 
+
+
+# ---------------------------------------------------------------------------
+# Email agent test redirect
+# ---------------------------------------------------------------------------
+
+class TestEmailAgentTestRedirect:
+    """Test emails must go to the owning user, not the configured recipient."""
+
+    def test_email_redirected_to_current_user(self, app, test_user):
+        """run_agent_test overrides to_email with the agent owner's address."""
+        from app.agents.test_runner import run_agent_test
+        from app.models import Job
+
+        config = {
+            'to_email': 'somebody-else@example.com',
+            'cc_email': 'cc@example.com',
+            'bcc_email': 'bcc@example.com',
+            'subject_template': 'Alert: {{ title }}',
+            'body_template': '{{ title }}',
+        }
+
+        captured = {}
+
+        def fake_act(self, events):
+            captured['to_email']  = self.config.get('to_email')
+            captured['cc_email']  = self.config.get('cc_email')
+            captured['bcc_email'] = self.config.get('bcc_email')
+            captured['subject']   = self.config.get('subject_template')
+
+        with app.app_context():
+            job = Job(
+                name='Test Email',
+                job_type='email_agent',
+                config=config,
+                user_id=test_user.id,
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+            from app.agents.types.email_agent import EmailAgent
+            with patch.object(EmailAgent, 'validate_config', return_value=None), \
+                 patch.object(EmailAgent, 'act', fake_act):
+                result = run_agent_test(job, {'title': 'hello'}, db.session)
+
+        assert result['status'] == 'ok', result.get('error')
+        assert captured['to_email'] == test_user.email
+        assert 'cc_email'  not in captured or captured['cc_email']  is None
+        assert 'bcc_email' not in captured or captured['bcc_email'] is None
+        assert captured['subject'].startswith('[TEST] ')
+
+    def test_subject_prefixed_with_test(self, app, test_user):
+        """Subject template is prefixed with [TEST] in test mode."""
+        from app.agents.test_runner import run_agent_test
+        from app.models import Job
+
+        captured = {}
+
+        def fake_act(self, events):
+            captured['subject'] = self.config.get('subject_template')
+
+        with app.app_context():
+            job = Job(
+                name='Test Email Subject',
+                job_type='email_agent',
+                config={
+                    'to_email': 'real@example.com',
+                    'subject_template': 'Daily Digest',
+                    'body_template': 'body',
+                },
+                user_id=test_user.id,
+            )
+            db.session.add(job)
+            db.session.commit()
+
+            from app.agents.types.email_agent import EmailAgent
+            with patch.object(EmailAgent, 'validate_config', return_value=None), \
+                 patch.object(EmailAgent, 'act', fake_act):
+                run_agent_test(job, {}, db.session)
+
+        assert captured['subject'] == '[TEST] Daily Digest'

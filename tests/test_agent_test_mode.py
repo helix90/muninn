@@ -393,3 +393,34 @@ class TestEmailAgentTestRedirect:
                 run_agent_test(job, {}, db.session)
 
         assert captured['subject'] == '[TEST] Daily Digest'
+
+    def test_smtp_error_surfaces_in_result(self, app, test_user):
+        """When _send_email raises, run_agent_test returns status='error' not 'ok'."""
+        import smtplib
+        from app.agents.test_runner import run_agent_test
+        from app.models import Job
+        from app.agents.types.email_agent import EmailAgent
+
+        with app.app_context():
+            job = Job(
+                name='Test Email SMTP Fail',
+                job_type='email_agent',
+                config={
+                    'to_email': 'real@example.com',
+                    'subject_template': 'Subject',
+                    'body_template': 'body',
+                },
+                user_id=test_user.id,
+            )
+            db.session.add(job)
+            db.session.commit()
+
+            def raise_smtp(*args, **kwargs):
+                raise smtplib.SMTPAuthenticationError(535, b'Authentication failed')
+
+            with patch.object(EmailAgent, 'validate_config', return_value=None), \
+                 patch.object(EmailAgent, '_send_email', raise_smtp):
+                result = run_agent_test(job, {'title': 'hello'}, db.session)
+
+        assert result['status'] == 'error', f"Expected error, got: {result}"
+        assert 'Authentication' in result['error'] or '535' in result['error']

@@ -100,6 +100,11 @@ def run_agent_test(agent_model, payload_dict: Dict[str, Any], db_session) -> Dic
         # Suppress event cleanup so no existing events are deleted during the test
         agent._cleanup_old_events = lambda: 0
 
+        # For action agents that swallow exceptions internally (e.g. EmailAgent),
+        # attach an error collector so failures are visible to the test result.
+        if agent_category == 'action':
+            agent._test_mode_errors = []
+
         # Build input events
         if agent_category == 'source':
             input_events = []
@@ -116,6 +121,16 @@ def run_agent_test(agent_model, payload_dict: Dict[str, Any], db_session) -> Dic
         t0 = time.time()
         output_events = agent.check(input_events)
         duration_ms = round((time.time() - t0) * 1000)
+
+        # Surface errors that action agents swallow internally.
+        test_errors = getattr(agent, '_test_mode_errors', [])
+        if test_errors:
+            return {
+                'status': 'error',
+                'error': test_errors[0],
+                'agent_category': agent_category,
+                'duration_ms': duration_ms,
+            }
 
         # Serialize BEFORE rolling back (some agents flush new events to the session)
         output_dicts = []

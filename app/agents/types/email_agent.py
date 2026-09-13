@@ -191,6 +191,8 @@ class EmailAgent(ActionAgent):
                     'event_id': event.id,
                     'error': str(e)
                 })
+                if hasattr(self, '_test_mode_errors'):
+                    self._test_mode_errors.append(str(e))
 
         self.log(f'Processed {len(events)} events', data={
             'sent_count': sent_count,

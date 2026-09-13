@@ -256,6 +256,65 @@ class TestAgentDetailView:
         content = response.data.decode('utf-8')
         assert 'Detailed Agent' in content
 
+    def test_agent_detail_event_payload_displays_html_readably(self, authenticated_client, db_session, test_user):
+        """
+        Regression test: the "Show Payload" panel on an agent's detail page
+        used Jinja's built-in |tojson filter to pretty-print event.payload
+        inside a <pre> block. |tojson HTML-escapes '<'/'>'/'&' as
+        \\u003c/\\u003e/\\u0026 (safe for embedding JSON in a <script> tag),
+        which is exactly wrong for plain visible text: users saw literal
+        "\\u003cp\\u003e" instead of a readable "<p>" for any HTML-ish
+        payload field (e.g. an hnrss.org RSS item's 'content' field).
+
+        Fixed by switching to the app's existing format_json filter (see
+        app/__init__.py register_template_filters), which is already used
+        by the events/*.html and pipeline_runs/detail.html pages -- this
+        agent detail page was the one place still using raw |tojson.
+        """
+        from app.models import Event
+
+        agent = Job(
+            name='HN RSS Agent',
+            job_type='rss_agent',
+            config={'feed_url': 'https://hnrss.org/newest'},
+            user_id=test_user.id
+        )
+        db_session.add(agent)
+        db_session.commit()
+
+        event = Event(
+            agent_id=agent.id,
+            agent_type='rss_agent',
+            user_id=test_user.id,
+            payload={'content': '<p>Article URL: <a href="https://example.com">https://example.com</a></p>'},
+            metadata={},
+        )
+        db_session.add(event)
+        db_session.commit()
+
+        response = authenticated_client.get(f'/agents/{agent.id}')
+        content = response.data.decode('utf-8')
+
+        assert '&lt;p&gt;Article URL' in content
+        assert '\\u003c' not in content
+
+    def test_agent_detail_test_payload_textarea_displays_html_readably(self, authenticated_client, db_session, test_user):
+        """Same bug, same fix, for the "Test Payload" textarea (sample_payload)."""
+        agent = Job(
+            name='HTML Parser Agent',
+            job_type='html_parser_agent',
+            config={'selectors': {'title': 'h1'}},
+            user_id=test_user.id
+        )
+        db_session.add(agent)
+        db_session.commit()
+
+        response = authenticated_client.get(f'/agents/{agent.id}')
+        content = response.data.decode('utf-8')
+
+        assert '&lt;h1&gt;Title&lt;/h1&gt;' in content
+        assert '\\u003c' not in content
+
     def test_agent_detail_nonexistent_agent(self, authenticated_client):
         """Test viewing non-existent agent returns appropriate error."""
         response = authenticated_client.get('/agents/99999')

@@ -341,7 +341,7 @@
                     </button>
                 </div>
                 <div id="payload-{{ event.id }}" class="hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <pre class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto">{{ event.payload|tojson(indent=2) }}</pre>
+                    <pre class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto">{{ event.payload|format_json }}</pre>
                 </div>
             </div>
             {% endfor %}
@@ -370,7 +370,7 @@
         {% if capabilities.can_receive_events %}
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Test Payload (JSON)</label>
-            <textarea id="test-payload" rows="8" class="w-full font-mono text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ sample_payload | tojson(indent=2) }}</textarea>
+            <textarea id="test-payload" rows="8" class="w-full font-mono text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ sample_payload | format_json }}</textarea>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Edit the payload above to match the data this agent would normally receive.</p>
         </div>
         {% endif %}

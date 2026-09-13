@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Hacking Things",
+    "description": "Hacking tools, articles, and other resources.\r\n",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Filter For Botnet/Ransomware",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "ransomware|botnet"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Filter For Vulnerability",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "[vV]ulnerability"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Hacking News RSS Cleanup",
+      "job_type": "template_agent",
+      "config": {
+        "templates": {
+          "url": "{{ url }}",
+          "title": "{{ title }}",
+          "authors": "{{ authors }}",
+          "categories": "{{ categories }}",
+          "date_published": "{{ date_published }}"
+        },
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Bleeping Computer",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://www.bleepingcomputer.com/feed/"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Filter For Cyber Security",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "[cC]yber\\s[sS]ecurity"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "Filter For IoT",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "I[oO]T"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "Filter For Malicious",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "[mM]alicious"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 7,
+      "name": "HackADay Articles",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://hackaday.com/blog/feed/"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 8,
+      "name": "Hacking News E-mailer",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "helix90@gmail.com",
+          "helix@helixandvixen.com"
+        ],
+        "subject": "You have some notifications!",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 5 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 9,
+      "name": "Filter For infrastructure",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "infrastructure"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 10,
+      "name": "Filter For Polymarket",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "polymarket"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 11,
+      "name": "Filter For 3D Printing",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "3D Print"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 12,
+      "name": "Gizmodo Feed",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://gizmodo.com/feed"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 2
+    },
+    {
+      "source": 1,
+      "target": 2
+    },
+    {
+      "source": 2,
+      "target": 8
+    },
+    {
+      "source": 3,
+      "target": 5
+    },
+    {
+      "source": 3,
+      "target": 9
+    },
+    {
+      "source": 3,
+      "target": 6
+    },
+    {
+      "source": 3,
+      "target": 0
+    },
+    {
+      "source": 3,
+      "target": 4
+    },
+    {
+      "source": 3,
+      "target": 1
+    },
+    {
+      "source": 3,
+      "target": 11
+    },
+    {
+      "source": 3,
+      "target": 10
+    },
+    {
+      "source": 4,
+      "target": 2
+    },
+    {
+      "source": 5,
+      "target": 2
+    },
+    {
+      "source": 6,
+      "target": 2
+    },
+    {
+      "source": 7,
+      "target": 5
+    },
+    {
+      "source": 7,
+      "target": 9
+    },
+    {
+      "source": 7,
+      "target": 6
+    },
+    {
+      "source": 7,
+      "target": 1
+    },
+    {
+      "source": 7,
+      "target": 0
+    },
+    {
+      "source": 7,
+      "target": 4
+    },
+    {
+      "source": 7,
+      "target": 11
+    },
+    {
+      "source": 7,
+      "target": 10
+    },
+    {
+      "source": 9,
+      "target": 2
+    },
+    {
+      "source": 10,
+      "target": 2
+    },
+    {
+      "source": 11,
+      "target": 2
+    },
+    {
+      "source": 12,
+      "target": 5
+    },
+    {
+      "source": 12,
+      "target": 11
+    },
+    {
+      "source": 12,
+      "target": 9
+    },
+    {
+      "source": 12,
+      "target": 6
+    },
+    {
+      "source": 12,
+      "target": 1
+    },
+    {
+      "source": 12,
+      "target": 0
+    },
+    {
+      "source": 12,
+      "target": 4
+    },
+    {
+      "source": 12,
+      "target": 10
+    }
+  ]
+}

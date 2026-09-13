@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Key Value Testing",
+    "description": "Testing the Key-Value store\r\ngetting data into it and getting data out of it\r\nThis one uses Controllers rather than events",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "KV Testing",
+      "job_type": "datastore_write_agent",
+      "config": {
+        "namespace": "huginn_kv",
+        "key_template": "{{ title }}",
+        "value_template": "{{ type }}"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "KV E-mail test",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "",
+        "subject": "Key/Value notification!",
+        "body": "{{ var.title }}"
+      },
+      "schedule_cron": "0 5 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "KV Formatter",
+      "job_type": "template_agent",
+      "config": {
+        "template": "{{ book | as_object }}",
+        "output_field": "message",
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "KV Tester",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "KV Trigger Test",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "var.title",
+            "value": "dune"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "KV E-mail Test 2",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "",
+        "subject": "You have a notification!",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 21 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "target": 0
+    },
+    {
+      "source": 4,
+      "target": 5
+    }
+  ]
+}

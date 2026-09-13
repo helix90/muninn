@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Weather on demand",
+    "description": "Weather on demand.\r\nPost a location, and an optional day indicator, and get the weather or weather forecast.\r\n\r\nCalls <weather service> to get the weather information.",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Weather Request",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook",
+        "secret": "b99368cb-f621-4f0f-bf2d-61823e7bbc14"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": []
+}

@@ -169,6 +169,30 @@ Scenarios group agents into named pipelines and let you visualise the event flow
 | `pirate_weather_report.json` | Daily forecast from Pirate Weather — high/low, precipitation, moon phase, sunrise/sunset |
 | `airnow_aqi_report.json` | Daily AQI report from AirNow — overall AQI, per-pollutant breakdown, health guidance |
 
+**Converted Huginn scenarios** are in [`examples/huginn/`](examples/huginn/) — 19 real-world scenarios translated from Huginn to Muninn format, importable directly via Scenarios → Import Scenario:
+
+| File | Huginn scenario | Agents |
+|------|----------------|--------|
+| `RSS_to_Jabber.json` | RSS to Jabber | 8 |
+| `airwall-things.json` | Airwall Things | 29 |
+| `article-grabber.json` | Article Grabber | 4 |
+| `bbc-news.json` | BBC News | 7 |
+| `blog-post-agents.json` | Blog Post Agents (weather-based) | 6 |
+| `default-scenario.json` | Default Scenario (weather + XKCD digest) | 13 |
+| `e-mail-testing.json` | E-mail Testing | 4 |
+| `email-checker.json` | Email Checker | 2 |
+| `hacking-things.json` | Hacking Things (security news feeds) | 13 |
+| `key-value-testing.json` | Key Value Testing | 6 |
+| `mqtt-testing.json` | MQTT Testing | 3 |
+| `new-script-extender.json` | New Script Extender | 4 |
+| `news-sources.json` | News Sources | 8 |
+| `newspaper-layout.json` | Newspaper Layout | 13 |
+| `research-testing.json` | Research Testing (IP monitoring) | 7 |
+| `rube-goldberg.json` | Rube Goldberg | 4 |
+| `washington-quakes.json` | Washington Quakes | 4 |
+| `weather-on-demand.json` | Weather on Demand | 1 |
+| `weather.json` | Weather (full pipeline) | 12 |
+
 ---
 
 ## Importing from Huginn
@@ -214,6 +238,8 @@ Export your scenario from Huginn via `Scenarios → Export`. The tool handles Hu
 | TwitterAgent, JavaScriptAgent, DataOutputAgent, EventDiffAgent | — | Skipped |
 
 Skipped agents are noted in the tool output; the rest of the scenario imports cleanly.
+
+The [`examples/huginn/`](examples/huginn/) directory contains 19 pre-converted scenarios from the `Huginn Scenarios/` source files, ready to import without running the tool yourself.
 
 ---
 

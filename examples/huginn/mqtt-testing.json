@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "MQTT Testing",
+    "description": "Testing MQTT using the MQTT broker on HomeAssistant",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "MQTT Output formatter",
+      "job_type": "template_agent",
+      "config": {
+        "template": "When you use the \"Last event in\" or \"Merge events\" option, you can use variables from the last event received, like this:\r\n\r\nName: {{ name }}\r\nUrl:  {{ url }}\r\n\r\nIf you use the \"Last X Events\" mode, a set of events will be passed to your Liquid template.  You can use them like this:\r\n\r\n<table class=\"table\">\r\n  {% for event in events %}\r\n    <tr>\r\n      <td>{{ event.title }}</td>\r\n      <td><a href=\"{{ event.url }}\">Click here to see</a></td>\r\n    </tr>\r\n  {% endfor %}\r\n</table>\r\n",
+        "output_field": "rendered",
+        "preserve_original": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "sample mqtt",
+      "job_type": "mqtt_subscriber_agent",
+      "config": {
+        "host": "192.168.0.185",
+        "port": 1883,
+        "topic": "huginn",
+        "username": "sysuser",
+        "password": "SysUser1",
+        "poll_duration": 10
+      },
+      "schedule_cron": "* * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Insert MQTT Event",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "target": 0
+    },
+    {
+      "source": 2,
+      "target": 1
+    }
+  ]
+}

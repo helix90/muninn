@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Blog Post Agents",
+    "description": "Agent testing for Blog Posts",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Open Weathermap Filter - Cold",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "less_than",
+            "field": "weather.main.temp",
+            "value": "10"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Open Weathermap Filter - Moderate",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "weather.main.temp",
+            "value": "10"
+          },
+          {
+            "type": "less_than",
+            "field": "weather.main.temp",
+            "value": "20"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Open Weather Map API",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.openweathermap.org/data/2.5/weather?lat=47.96&lon=-122.50&units=imperial&appid={% credential open_weathermap %}"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Open Weather Map API (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "weather": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Weather Report E-mailer",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "test@example.com",
+        "subject": "Todays Weather",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 6 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "Open Weathermap Filter - Warm",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "weather.main.temp",
+            "value": "20"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 2,
+      "target": 3
+    },
+    {
+      "source": 0,
+      "target": 4
+    },
+    {
+      "source": 1,
+      "target": 4
+    },
+    {
+      "source": 3,
+      "target": 5
+    },
+    {
+      "source": 3,
+      "target": 1
+    },
+    {
+      "source": 3,
+      "target": 0
+    },
+    {
+      "source": 5,
+      "target": 4
+    }
+  ]
+}

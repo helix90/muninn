@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Article Grabber",
+    "description": "Use Phantom JS to grab articles from news sites that have subscription or ad check blockers.",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Fetch Processed Article",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "{{ url }}"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Fetch Processed Article (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "url": "/html/body"
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Email Actions Articles",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "subject",
+            "value": "fetch article"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Grab Seattle Times",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "{{ body }}",
+        "headers": {
+          "User-Agent": "Huginn - https://github.com/huginn/huginn"
+        }
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 2,
+      "target": 3
+    },
+    {
+      "source": 3,
+      "target": 0
+    }
+  ]
+}

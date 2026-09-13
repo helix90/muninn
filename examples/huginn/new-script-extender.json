@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "New Script Extender",
+    "description": "Fallout 4 Script Extender watcher",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Check for change f4se",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "output"
+        ],
+        "lookback_days": 1
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Dedup from F4sse",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "{{output}}"
+        ]
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "F4SE",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://f4se.silverlock.org/"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "F4SE (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "url": "/html/body/p[2]/u"
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 2,
+      "target": 3
+    },
+    {
+      "source": 3,
+      "target": 0
+    },
+    {
+      "source": 3,
+      "target": 1
+    }
+  ]
+}

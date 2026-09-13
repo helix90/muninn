@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Research Testing",
+    "description": "Agents to test theories and show examples",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "What's my IP Address - take 2",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://whatismyipaddress.com/"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": false,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "What's my IP Address - take 2 (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "IP": "/html/body/div[1]/div/div/div/div/article/div/div/div[1]/div/div[2]/div/div/div/div/div/div[2]/div[1]/div[1]/p[3]/span[2]"
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": false,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "IP Address Change",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "results.ip_address"
+        ],
+        "lookback_days": 1
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "What's my IP Address",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://whatsmyip.com/"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": false,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "What's my IP Address (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "IP": "/html/body/div/div[4]/div/main/section[1]/div[2]/div[3]/div[1]/div[2]/div[2]/span"
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": false,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "What's my IP Address - take 3 - API",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.whatismyip.com/ip.php?key={% credential whats_my_ip_key %}&output=json"
+      },
+      "schedule_cron": "0 */2 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "What's my IP Address - take 3 - API (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "results": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 3,
+      "target": 4
+    },
+    {
+      "source": 5,
+      "target": 6
+    },
+    {
+      "source": 6,
+      "target": 2
+    }
+  ]
+}

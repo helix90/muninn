@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "e-mail testing",
+    "description": "No description provided",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "E-mail address filter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "recipient",
+            "value": "^[^@]+@[^@]+\\.[^@]+$"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Inbound Webhook for testing",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook",
+        "secret": "a484df0e-f82a-4c70-8f05-93127838264f"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Test E-mail Sender",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "helix90@gmail.com",
+          "{{ recipient }}"
+        ],
+        "subject": "You have a notification!",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "echobot imap",
+      "job_type": "imap_agent",
+      "config": {
+        "host": "imap.dreamhost.com",
+        "port": 993,
+        "username": "echobot@helixandvixen.com",
+        "password": "{% credential echobot_imap %}",
+        "folder": "INBOX",
+        "use_ssl": true
+      },
+      "schedule_cron": "*/30 * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 2
+    },
+    {
+      "source": 1,
+      "target": 2
+    },
+    {
+      "source": 3,
+      "target": 2
+    },
+    {
+      "source": 3,
+      "target": 0
+    }
+  ]
+}

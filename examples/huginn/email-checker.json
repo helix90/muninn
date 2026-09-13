@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Email Checker",
+    "description": "Check the e-mail configurations",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "E-Mail event tester",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Test E-mail Agents",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "{{ destination }}",
+          "helix@helixandvixen.com"
+        ],
+        "subject": "This is a test e-mail",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 5 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 1
+    }
+  ]
+}

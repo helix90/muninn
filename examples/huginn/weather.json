@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Weather",
+    "description": "How's the weather?  Do I need an umbrella, sun screen?",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Everett Weather",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/47.9566,-122.3732?units=si&exclude=minutely,flags"
+      },
+      "schedule_cron": "0 2 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Weather Update Mail",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "",
+        "subject": "Todays Weather",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Heat Checker",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "high.fahrenheit",
+            "value": "80"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Weather Report Lookup  location",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.api-ninjas.com/v1/reversegeocoding?lat={{lat}}&lon={{lon}}"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Weather Report Lookup  location (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "city": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "HelixBot Weather Jabber Agent",
+      "job_type": "jabber_agent",
+      "config": {
+        "jid": "helixbot@freedombox.helixlabs.tech",
+        "password": "{{credential:helixbot_imap}}",
+        "recipient": "helix@freedombox.helixlabs.tech",
+        "message_template": "It will be {{ high.fahrenheit }} out today, and it looks like {{ conditions }} out there.",
+        "server": "freedombox.helixlabs.tech"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "Air Quality Everett",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "http://www.airnowapi.org/aq/forecast/zipCode/?format=application/json&zipCode=98201&distance=25&API_KEY={% credential airnow_api_key %}"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 7,
+      "name": "Air Quality Everett (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "aqi": "",
+          "summary": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 8,
+      "name": "Cold Checker",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "less_than",
+            "field": "high.fahrenheit",
+            "value": "40"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 9,
+      "name": "AQI Checker",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "aqi",
+            "value": "45"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 10,
+      "name": "Weather Location Formatter",
+      "job_type": "template_agent",
+      "config": {
+        "templates": {
+          "lat": "{{ location | split(',') | first }}",
+          "lon": "{{ location | split(',') | reverse | first }}"
+        },
+        "preserve_original": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 11,
+      "name": "Rain Checker",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "conditions",
+            "value": "rain"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "target": 4
+    },
+    {
+      "source": 6,
+      "target": 7
+    },
+    {
+      "source": 0,
+      "target": 11
+    },
+    {
+      "source": 0,
+      "target": 2
+    },
+    {
+      "source": 0,
+      "target": 8
+    },
+    {
+      "source": 0,
+      "target": 5
+    },
+    {
+      "source": 2,
+      "target": 10
+    },
+    {
+      "source": 4,
+      "target": 1
+    },
+    {
+      "source": 7,
+      "target": 9
+    },
+    {
+      "source": 8,
+      "target": 10
+    },
+    {
+      "source": 10,
+      "target": 3
+    },
+    {
+      "source": 11,
+      "target": 10
+    }
+  ]
+}

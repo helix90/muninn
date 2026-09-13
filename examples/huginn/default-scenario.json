@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "default-scenario",
+    "description": "This scenario has a few agents to get you started. Feel free to change them or delete them as you see fit!",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Location Formatter",
+      "job_type": "template_agent",
+      "config": {
+        "templates": {
+          "lat": "{{ location | split(',') | first }}",
+          "lon": "{{ location | split(',') | reverse | first }}"
+        },
+        "preserve_original": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Eugene Weather Agent",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/44.0598168,-123.2779095?units=si&exclude=minutely,flags"
+      },
+      "schedule_cron": "0 22 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Rain Notifier",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "conditions",
+            "value": "rain|storm"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "XKCD Source",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://xkcd.com"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "XKCD Source (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "url": "#comic img",
+          "title": "#comic img",
+          "hovertext": "#comic img"
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "Afternoon Digest",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "helix90@gmail.com",
+        "subject": "Your Afternoon Digest",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 17 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "Fancy Rain Notifier",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "conditions",
+            "value": "rain|storm"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 7,
+      "name": "Everett Weather Agent",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/47.9570176,-122.2087304?units=si&exclude=minutely,flags"
+      },
+      "schedule_cron": "0 22 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 8,
+      "name": "Morning Digest",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "helix90@gmail.com",
+        "subject": "Your Morning Digest",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 6 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 9,
+      "name": "Seattle Weather Agent",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/47.6088012,-122.4221974?units=si&exclude=minutely,flags"
+      },
+      "schedule_cron": "0 22 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 10,
+      "name": "Comic Formatter",
+      "job_type": "template_agent",
+      "config": {
+        "template": "<h2>{{ title }}</h2><img src=\"https:{{ url }}\"/> <p>{{ hovertext }}</p>",
+        "output_field": "message",
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 11,
+      "name": "City Lookup from location",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.api-ninjas.com/v1/reversegeocoding?lat={{lat}}&lon={{lon}}"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 12,
+      "name": "City Lookup from location (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "city": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "target": 4
+    },
+    {
+      "source": 11,
+      "target": 12
+    },
+    {
+      "source": 0,
+      "target": 11
+    },
+    {
+      "source": 1,
+      "target": 0
+    },
+    {
+      "source": 2,
+      "target": 8
+    },
+    {
+      "source": 4,
+      "target": 10
+    },
+    {
+      "source": 6,
+      "target": 8
+    },
+    {
+      "source": 7,
+      "target": 0
+    },
+    {
+      "source": 9,
+      "target": 0
+    },
+    {
+      "source": 10,
+      "target": 5
+    },
+    {
+      "source": 12,
+      "target": 6
+    }
+  ]
+}

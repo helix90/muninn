@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "exported_at": "2026-05-28T03:46:55.608096+00:00",
+  "exported_by": "helix",
+  "scenario": {
+    "name": "RSS to Jabber",
+    "description": "Various RSS Feeds filtered and links sent to Jabber",
+    "color": "#15c188",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "RSS Feed Reader",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {
+        "feed_url": "https://www.bleepingcomputer.com/feed/",
+        "event_retention_days": 90,
+        "max_entries": 50,
+        "days_back": 7,
+        "deduplication_days": 30
+      },
+      "schedule_cron": "0 * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 1,
+      "name": "Hardware check",
+      "job_type": "filter_agent",
+      "description": null,
+      "config": {
+        "rules": [
+          {
+            "field": "title",
+            "type": "contains",
+            "value": "hard",
+            "case_sensitive": false
+          }
+        ],
+        "match_all": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 2,
+      "name": "New RSS Agent",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {
+        "feed_url": "https://hackaday.com/blog/feed/",
+        "event_retention_days": 90,
+        "max_entries": 50,
+        "days_back": 7,
+        "deduplication_days": 30
+      },
+      "schedule_cron": "0 * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 3,
+      "name": "Jabber Test",
+      "job_type": "jabber_agent",
+      "description": null,
+      "config": {
+        "jid": "helixbot@freedombox.helixlabs.tech",
+        "password": "FblE2013aa",
+        "recipient": "helix@freedombox.helixlabs.tech",
+        "message_template": "{{ payload.title }} - {{ payload.link }}",
+        "server": "freedombox.helixlabs.tech",
+        "port": 5222,
+        "use_tls": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 4,
+      "name": "Microsoft check",
+      "job_type": "filter_agent",
+      "description": null,
+      "config": {
+        "rules": [
+          {
+            "field": "title",
+            "type": "contains",
+            "value": "microsoft",
+            "case_sensitive": false
+          }
+        ],
+        "match_all": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 5,
+      "name": "RSS Feed Reader Gizmodo",
+      "job_type": "rss_agent",
+      "description": null,
+      "config": {
+        "feed_url": "https://gizmodo.com/feed",
+        "event_retention_days": 90,
+        "max_entries": 50,
+        "days_back": 7,
+        "deduplication_days": 30
+      },
+      "schedule_cron": "0 * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 6,
+      "name": "Vulnerability Check",
+      "job_type": "filter_agent",
+      "description": null,
+      "config": {
+        "rules": [
+          {
+            "field": "title",
+            "type": "contains",
+            "value": "vulnerability",
+            "case_sensitive": false
+          }
+        ],
+        "match_all": true
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    },
+    {
+      "export_id": 7,
+      "name": "DeDup the Feed",
+      "job_type": "deduplication_agent",
+      "description": null,
+      "config": {
+        "uniqueness_fields": [
+          "title"
+        ],
+        "lookback_days": 14,
+        "memory_limit": 10000
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0,
+      "tags": null
+    }
+  ],
+  "links": [
+    {
+      "source": 2,
+      "target": 1
+    },
+    {
+      "source": 2,
+      "target": 4
+    },
+    {
+      "source": 5,
+      "target": 1
+    },
+    {
+      "source": 5,
+      "target": 4
+    },
+    {
+      "source": 2,
+      "target": 6
+    },
+    {
+      "source": 5,
+      "target": 6
+    },
+    {
+      "source": 1,
+      "target": 7
+    },
+    {
+      "source": 4,
+      "target": 7
+    },
+    {
+      "source": 6,
+      "target": 7
+    },
+    {
+      "source": 7,
+      "target": 3
+    },
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 0,
+      "target": 4
+    },
+    {
+      "source": 0,
+      "target": 6
+    }
+  ]
+}

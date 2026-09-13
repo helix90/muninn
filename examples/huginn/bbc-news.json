@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "BBC News",
+    "description": "News from the BBC web site",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "BBC Filter For 3D Printing",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "3D Printing"
+          },
+          {
+            "type": "regex",
+            "field": "description",
+            "value": "3D printing"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "BBC Filter For Ailine",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "airline"
+          },
+          {
+            "type": "regex",
+            "field": "description",
+            "value": "airline"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "BBC Filter For Kent",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "Kent"
+          },
+          {
+            "type": "regex",
+            "field": "description",
+            "value": "Kent"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "BBC News RSS",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "BBC Filter For London",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "title",
+            "value": "London"
+          },
+          {
+            "type": "regex",
+            "field": "description",
+            "value": "London"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "Daily BBC News Digest",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "helix@helixandvixen.com",
+          "helix90@gmail.com",
+          "helix90@proton.me"
+        ],
+        "subject": "Hacker News Digest",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 5 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "BBC News Deduplicate",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "{{url}}"
+        ]
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 5
+    },
+    {
+      "source": 1,
+      "target": 5
+    },
+    {
+      "source": 2,
+      "target": 5
+    },
+    {
+      "source": 3,
+      "target": 6
+    },
+    {
+      "source": 4,
+      "target": 5
+    },
+    {
+      "source": 6,
+      "target": 0
+    },
+    {
+      "source": 6,
+      "target": 4
+    },
+    {
+      "source": 6,
+      "target": 2
+    },
+    {
+      "source": 6,
+      "target": 1
+    }
+  ]
+}

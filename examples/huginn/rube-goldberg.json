@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Rube Goldberg",
+    "description": "Rube Goldberg machine using Huginn and NodeRed to do things together.",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Kickoff Hook",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook",
+        "secret": "fbfb612b-5c09-4fbc-bfef-1e7d53858779"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Manual Good Morning",
+      "job_type": "webhook_agent",
+      "config": {
+        "path": "/webhook"
+      },
+      "schedule_cron": "0 6 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "HelixBot General Jabber Agent",
+      "job_type": "jabber_agent",
+      "config": {
+        "jid": "helixbot@freedombox.helixlabs.tech",
+        "password": "{{credential:helixbot_imap}}",
+        "recipient": "helix@freedombox.helixlabs.tech",
+        "message_template": "{{ message }}",
+        "server": "freedombox.helixlabs.tech"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Good Morning Trigger",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "regex",
+            "field": "_json",
+            "value": "^.*\\d\\d\\d\\d.*$"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 3
+    },
+    {
+      "source": 1,
+      "target": 2
+    },
+    {
+      "source": 3,
+      "target": 2
+    }
+  ]
+}

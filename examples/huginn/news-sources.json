@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "News Sources",
+    "description": "News from various web sites",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Vox News Deduplicate",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "{{url}}"
+        ]
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Vox RSS Feed",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://www.vox.com/rss/index.xml"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Hacker News Deduplicate",
+      "job_type": "deduplication_agent",
+      "config": {
+        "uniqueness_fields": [
+          "{{url}}"
+        ]
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Hacker News RSS",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://news.ycombinator.com/rss"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "RSS Cleanup",
+      "job_type": "template_agent",
+      "config": {
+        "templates": {
+          "url": "{{ url }}",
+          "title": "{{ title }}",
+          "authors": "{{ authors }}",
+          "date_published": "{{ date_published }}"
+        },
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "HackADay Articles",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://hackaday.com/blog/feed/"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "Everett Local Newsletter",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://www.everettcommunity.org/news/atom.xml"
+      },
+      "schedule_cron": "0 0 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 7,
+      "name": "Daily News DIgest",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": "",
+        "subject": "Hacker News Digest",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 5 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 4
+    },
+    {
+      "source": 1,
+      "target": 0
+    },
+    {
+      "source": 2,
+      "target": 4
+    },
+    {
+      "source": 3,
+      "target": 2
+    },
+    {
+      "source": 4,
+      "target": 7
+    }
+  ]
+}

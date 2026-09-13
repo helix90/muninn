@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Washington Quakes",
+    "description": "Watching USGS for quakes in the area",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Quake Watch Everett",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "http://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&{% credential home_location %}&maxradiuskm=25&limit=1&format=geojson&eventtype=earthquake&minmagnitude=3.0"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Quake Watch Everett (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "url": "",
+          "location": "",
+          "magnitude": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Quake Watch Seattle",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "http://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&{% credential seattle_location %}&maxradiuskm=25&limit=1&format=geojson&eventtype=earthquake&minmagnitude=3.0"
+      },
+      "schedule_cron": "0 */12 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Quake Watch Seattle (parser)",
+      "job_type": "html_parser_agent",
+      "config": {
+        "content_field": "body",
+        "selectors": {
+          "url": "",
+          "location": "",
+          "magnitude": ""
+        },
+        "extract_mode": "first"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 2,
+      "target": 3
+    }
+  ]
+}

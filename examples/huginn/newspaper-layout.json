@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "scenario": {
+    "name": "Newspaper Layout",
+    "description": "Make a newspaper.  Like the old Waldport rag that was on printer paper, etc.\r\n\r\nDate, weather, sunset and rise, moon phase, etc.\r\nTides?\r\n\r\nHeadlines pulled from some place.  (At proto?)\r\n\r\nE-mail Digest is disabled.  It was for testing, and doesn't really do what we need.  Digest Agent -> E-mail Agent works better for this.  Allowing the E-mail agent to do Liquid formatting of the e-mail.",
+    "color": "#3B82F6",
+    "is_active": true
+  },
+  "agents": [
+    {
+      "export_id": 0,
+      "name": "Moon Phase First Quarter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "equals",
+            "field": "moonPhase",
+            "value": "0.25"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 1,
+      "name": "Format Pirate Weather into News",
+      "job_type": "template_agent",
+      "config": {
+        "templates": {
+          "Low": "Predicted Low of {{ low.fahrenheit }} F",
+          "High": "Predicted High of {{ high.fahrenheit }} F",
+          "Rain": "Chance of Rain {{ percip.probability | times: 100 }}%",
+          "Sunset": "{{ sunsetTime | times: 1  }}",
+          "Sunrise": "{{ sunriseTime | times: 1  }}",
+          "Moon Phase": "The moon is currently {{ message }}",
+          "Weather Text": "Looks like the weather is going to be {{ conditions }}"
+        },
+        "preserve_original": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 2,
+      "name": "Pretty Email newsletter",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "helix90@gmail.com",
+          "helix@helixandvixen.com"
+        ],
+        "subject": "Daily News",
+        "body": "Sunset today is at {{ event.sunsetTime | times: 1  }}<br />\nSunrise today is at {{ event.sunriseTime | times: 1  }}<br />\nThe moon is currently {{ message }}<br />\nLooks like the weather is going to be {{ event.conditions }}<br />\n{{ events }}"
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": false,
+      "priority": 0
+    },
+    {
+      "export_id": 3,
+      "name": "Moon Phase Third Quarter",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "equals",
+            "field": "moonPhase",
+            "value": "0.75"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 4,
+      "name": "Moon Phase Waxing Gibbous",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "moonPhase",
+            "value": "0.25"
+          },
+          {
+            "type": "less_than",
+            "field": "moonPhase",
+            "value": "0.5"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 5,
+      "name": "Everett Newspaper",
+      "job_type": "email_agent",
+      "config": {
+        "to_email": [
+          "helix90@gmail.com",
+          "helix@helixandvixen.com"
+        ],
+        "subject": "Today's Edition",
+        "body": "{{ message }}"
+      },
+      "schedule_cron": "0 6 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 6,
+      "name": "Moon Phase Full",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "equals",
+            "field": "moonPhase",
+            "value": "0.5"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 7,
+      "name": "Everett Weather Agent",
+      "job_type": "web_fetch_agent",
+      "config": {
+        "url": "https://api.pirateweather.net/forecast/{{credential:pirate_weather_api_key}}/47.9570176,-122.2087304?units=si&exclude=minutely,flags"
+      },
+      "schedule_cron": "0 4 * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 8,
+      "name": "Moon Phase Waxing Crescent",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "moonPhase",
+            "value": "0"
+          },
+          {
+            "type": "less_than",
+            "field": "moonPhase",
+            "value": "0.25"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 9,
+      "name": "Moon Phase Waining Gibbous",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "moonPhase",
+            "value": "0.5"
+          },
+          {
+            "type": "less_than",
+            "field": "moonPhase",
+            "value": "0.75"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 10,
+      "name": "Moon Phase Dark",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "equals",
+            "field": "moonPhase",
+            "value": "0"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 11,
+      "name": "My Everett News RSS Feed",
+      "job_type": "rss_agent",
+      "config": {
+        "feed_url": "https://myeverettnews.com/feed/"
+      },
+      "schedule_cron": "0 * * * *",
+      "schedule_enabled": true,
+      "is_active": true,
+      "priority": 0
+    },
+    {
+      "export_id": 12,
+      "name": "Moon Phase Waining Crescent",
+      "job_type": "filter_agent",
+      "config": {
+        "rules": [
+          {
+            "type": "greater_than",
+            "field": "moonPhase",
+            "value": "0.75"
+          },
+          {
+            "type": "less_than",
+            "field": "moonPhase",
+            "value": "1"
+          }
+        ],
+        "match_all": false
+      },
+      "schedule_cron": null,
+      "schedule_enabled": false,
+      "is_active": true,
+      "priority": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 1,
+      "target": 5
+    },
+    {
+      "source": 3,
+      "target": 1
+    },
+    {
+      "source": 4,
+      "target": 1
+    },
+    {
+      "source": 6,
+      "target": 1
+    },
+    {
+      "source": 7,
+      "target": 6
+    },
+    {
+      "source": 7,
+      "target": 10
+    },
+    {
+      "source": 7,
+      "target": 0
+    },
+    {
+      "source": 7,
+      "target": 3
+    },
+    {
+      "source": 7,
+      "target": 8
+    },
+    {
+      "source": 7,
+      "target": 4
+    },
+    {
+      "source": 7,
+      "target": 12
+    },
+    {
+      "source": 7,
+      "target": 9
+    },
+    {
+      "source": 8,
+      "target": 1
+    },
+    {
+      "source": 9,
+      "target": 1
+    },
+    {
+      "source": 10,
+      "target": 1
+    },
+    {
+      "source": 11,
+      "target": 5
+    },
+    {
+      "source": 12,
+      "target": 1
+    }
+  ]
+}

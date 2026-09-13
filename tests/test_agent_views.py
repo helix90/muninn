@@ -360,6 +360,53 @@ class TestAgentEditView:
         assert updated_agent.config['max_entries'] == 50
         assert updated_agent.config['days_back'] == 14
 
+    def test_edit_agent_preserves_list_valued_config_field(self, authenticated_client, db_session, test_user):
+        """
+        Server-side half of a regression test for a bug where editing an
+        agent with a list-valued config field (e.g. DeduplicationAgent's
+        required 'uniqueness_fields') silently failed to save.
+
+        Root cause was in the edit form's JS (app/templates/agents/edit.html
+        generateFieldHTML()): it JSON.stringify's list/object values before
+        embedding them in a text input's value="..." attribute, but didn't
+        HTML-escape the result. The double quotes in e.g. '["link"]'
+        prematurely closed the attribute, so the browser truncated the
+        submitted value down to just '[' -- which failed json.loads()
+        server-side, got stored as the raw string '[', and was then
+        rejected by DeduplicationAgent.validate_config() ("must be a
+        list"), blocking the save. Fixed by adding an escapeHtml() helper.
+
+        NOTE: this test posts form data directly via the Flask test client,
+        which never executes the browser-side JS -- it does NOT exercise
+        the actual bug or prove the JS fix is correct (this test passes
+        identically with or without the edit.html change). It only guards
+        the server-side save path: given a correctly JSON-encoded list
+        value (what a fixed browser now sends), the save must succeed and
+        the list must persist correctly. There is no JS test runner in
+        this project to cover the client-side half.
+        """
+        agent = Job(
+            name='Deduplicate Across Feeds',
+            job_type='deduplication_agent',
+            config={'uniqueness_fields': ['link'], 'lookback_days': 14},
+            user_id=test_user.id
+        )
+        db_session.add(agent)
+        db_session.commit()
+        agent_id = agent.id
+
+        response = authenticated_client.post(f'/agents/{agent_id}/edit', data={
+            'name': 'Deduplicate Across Feeds',
+            'config_uniqueness_fields': '["link"]',
+            'config_lookback_days': '21',
+        })
+
+        assert response.status_code == 302
+
+        updated_agent = db_session.query(Job).filter(Job.id == agent_id).first()
+        assert updated_agent.config['uniqueness_fields'] == ['link']
+        assert updated_agent.config['lookback_days'] == 21
+
     def test_edit_agent_updates_schedule(self, authenticated_client, db_session, test_user):
         """Test that schedule can be updated."""
         agent = Job(

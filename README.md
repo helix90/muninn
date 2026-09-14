@@ -88,7 +88,7 @@ Consume events and perform terminal actions (no output events).
 ```bash
 git clone https://github.com/helix90/muninn.git
 cd muninn
-cp env.example .env          # edit SECRET_KEY at minimum
+cp .env.example .env          # edit SECRET_KEY at minimum
 docker compose -f docker/docker-compose.yml up -d
 ```
 
@@ -110,7 +110,7 @@ pip install -r requirements-dev.txt
 createdb muninn_dev
 createdb muninn_test
 
-cp env.example .env          # edit DATABASE_URL, SECRET_KEY, SMTP_* as needed
+cp .env.example .env          # edit DATABASE_URL, SECRET_KEY, SMTP_* as needed
 flask db upgrade             # run all migrations
 flask run
 ```

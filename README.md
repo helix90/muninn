@@ -13,7 +13,7 @@ Named after one of Odin's ravens, Muninn ("memory") keeps watch so you don't hav
 
 ## Features
 
-- **31 built-in agent types** — sources, transforms, and actions covering RSS, HTTP, email, IMAP, MQTT, S3, Slack, Telegram, Discord, Jabber, webhooks, and more
+- **33 built-in agent types** — sources, transforms, and actions covering RSS, HTTP, email, IMAP, MQTT, S3, Dropbox, Slack, Telegram, Discord, Jabber, webhooks, and more
 - **Scenario editor** — visual pipeline canvas for connecting agents; export/import scenarios as portable JSON
 - **Credential vault** — encrypted credential storage with `{{credential:name}}` templating in agent configs; importable/exportable
 - **REST API** — full CRUD for agents, events, and scenarios behind Bearer token auth (`/api/v1/`)
@@ -45,6 +45,7 @@ Fetch data from external sources on a schedule.
 | `scheduler_agent` | Emit time-based trigger events |
 | `jabber_listener_agent` | Receive incoming XMPP/Jabber messages |
 | `datastore_read_agent` | Read key-value data from the shared DataStore |
+| `dropbox_read_agent` | Monitor a Dropbox folder for new or modified files |
 
 ### Transform Agents
 Receive events from upstream agents, reshape the data, and pass results downstream.
@@ -78,6 +79,7 @@ Consume events and perform terminal actions (no output events).
 | `discord_webhook_agent` | Post messages to Discord channels via webhooks |
 | `jabber_agent` | Send XMPP/Jabber messages |
 | `mqtt_publisher_agent` | Publish events to MQTT topics |
+| `dropbox_write_agent` | Upload event content as a file to Dropbox |
 
 ---
 
@@ -321,7 +323,7 @@ Tests use a separate `muninn_test` database. Each test truncates tables via `DEL
 muninn/
 ├── app/
 │   ├── agents/
-│   │   ├── types/              # 31 agent implementations
+│   │   ├── types/              # 33 agent implementations
 │   │   ├── base.py             # SourceAgent / TransformAgent / ActionAgent base classes
 │   │   ├── registry.py         # Agent type registry
 │   │   └── test_runner.py      # Manual test mode (ephemeral, non-persisting)

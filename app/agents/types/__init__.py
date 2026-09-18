@@ -10,6 +10,7 @@ Source Agents:
 - IMAPAgent: Monitor email inbox via IMAP
 - MqttSubscriberAgent: Subscribe to MQTT topics (Mosquitto-compatible)
 - DataStoreReadAgent: Emit events from the shared DataStore
+- DropboxReadAgent: Monitor a Dropbox folder for new or modified files
 
 Transform Agents:
 - FilterAgent: Rule-based filtering
@@ -36,6 +37,7 @@ Action Agents:
 - SlackAgent: Send messages to Slack channels via Incoming Webhooks
 - TelegramAgent: Send messages via the Telegram Bot API
 - DataStoreWriteAgent: Write key-value data to the shared DataStore
+- DropboxWriteAgent: Upload event content as a file to Dropbox
 """
 
 # Import source agents
@@ -48,6 +50,7 @@ from app.agents.types.imap_agent import IMAPAgent
 from app.agents.types.webhook_agent import WebhookAgent
 from app.agents.types.mqtt_subscriber_agent import MqttSubscriberAgent
 from app.agents.types.datastore_read_agent import DataStoreReadAgent
+from app.agents.types.dropbox_read_agent import DropboxReadAgent
 
 # Import transform agents
 from app.agents.types.filter_agent import FilterAgent
@@ -74,6 +77,7 @@ from app.agents.types.mqtt_publisher_agent import MqttPublisherAgent
 from app.agents.types.slack_agent import SlackAgent
 from app.agents.types.telegram_agent import TelegramAgent
 from app.agents.types.datastore_write_agent import DataStoreWriteAgent
+from app.agents.types.dropbox_write_agent import DropboxWriteAgent
 
 __all__ = [
     # Source agents
@@ -86,6 +90,7 @@ __all__ = [
     'WebhookAgent',
     'MqttSubscriberAgent',
     'DataStoreReadAgent',
+    'DropboxReadAgent',
     # Transform agents
     'FilterAgent',
     'DeduplicationAgent',
@@ -110,4 +115,5 @@ __all__ = [
     'SlackAgent',
     'TelegramAgent',
     'DataStoreWriteAgent',
+    'DropboxWriteAgent',
 ]

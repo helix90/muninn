@@ -31,6 +31,7 @@ SAMPLE_PAYLOADS = {
     "mqtt_subscriber_agent":    {"topic": "sensors/temp", "value": 23.5, "unit": "C"},
     "jabber_listener_agent":    {"from": "user@example.com", "body": "Hello!"},
     "s3_bucket_monitor_agent":  {"bucket": "my-bucket", "key": "uploads/file.csv", "size": 1024},
+    "dropbox_read_agent":       {"name": "report.csv", "path": "/reports/report.csv", "size": 2048, "server_modified": "2026-09-18T09:00:00Z", "rev": "abc123", "id": "id:abc123"},
 
     # Transform agents
     "filter_agent":             _RSS_ITEM,
@@ -54,6 +55,7 @@ SAMPLE_PAYLOADS = {
     "jabber_agent":             {"subject": "Alert", "body": "Something needs your attention."},
     "mqtt_publisher_agent":     {"topic": "alerts/high", "value": 99.5},
     "datastore_write_agent":    {"key": "last_processed", "value": "article-1", "namespace": "rss_tracker"},
+    "dropbox_write_agent":      {"name": "report", "date": "2026-09-18", "content": "Line 1\nLine 2\n"},
 }
 
 DEFAULT_PAYLOAD = _GENERIC

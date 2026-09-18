@@ -170,6 +170,8 @@ Scenarios group agents into named pipelines and let you visualise the event flow
 |------|-------------|
 | `pirate_weather_report.json` | Daily forecast from Pirate Weather — high/low, precipitation, moon phase, sunrise/sunset |
 | `airnow_aqi_report.json` | Daily AQI report from AirNow — overall AQI, per-pollutant breakdown, health guidance |
+| `dropbox_inbox_watcher.json` | Email notification for every new file uploaded to a watched Dropbox folder |
+| `dropbox_rss_archive.json` | Save each new RSS article as a plain-text file in Dropbox, deduplicated over 30 days |
 
 **Converted Huginn scenarios** are in [`examples/huginn/`](examples/huginn/) — 19 real-world scenarios translated from Huginn to Muninn format, importable directly via Scenarios → Import Scenario:
 

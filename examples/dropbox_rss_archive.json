@@ -1,0 +1,95 @@
+{
+    "schema_version": 1,
+    "exported_at": "2026-09-18T00:00:00+00:00",
+    "exported_by": "muninn",
+    "scenario": {
+        "name": "RSS Feed to Dropbox Archive",
+        "description": "Fetches an RSS feed hourly, deduplicates articles, and saves each new item as a plain-text file in a Dropbox folder. Useful for building a personal read-later archive. Requires one credential: dropbox_token.",
+        "color": "#0061FF",
+        "is_active": false
+    },
+    "agents": [
+        {
+            "export_id": 0,
+            "name": "Fetch RSS Feed",
+            "job_type": "rss_agent",
+            "description": "Polls an RSS or Atom feed once per hour. Change feed_url to any feed you want to archive.",
+            "config": {
+                "feed_url": "https://feeds.arstechnica.com/arstechnica/index",
+                "max_events": 10
+            },
+            "schedule_cron": "0 * * * *",
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "rss",
+                "source"
+            ]
+        },
+        {
+            "export_id": 1,
+            "name": "Deduplicate Articles",
+            "job_type": "deduplication_agent",
+            "description": "Drops articles already seen in the past 30 days so each item is only saved once even if the feed re-publishes it.",
+            "config": {
+                "property": "link",
+                "window_seconds": 2592000
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "rss",
+                "transform"
+            ]
+        },
+        {
+            "export_id": 2,
+            "name": "Format Article",
+            "job_type": "template_agent",
+            "description": "Renders a plain-text article file and a safe filename slug from the RSS item fields.",
+            "config": {
+                "templates": {
+                    "file_content": "Title:     {{ title }}\nAuthor:    {{ author | default('Unknown') }}\nPublished: {{ published }}\nLink:      {{ link }}\n\n{{ summary | striptags }}\n",
+                    "file_slug": "{{ published[:10] }}_{{ title[:60] | lower | replace(' ', '-') | replace('/', '-') | replace(':', '') | replace('?', '') | replace('!', '') | replace(',', '') | replace('\"', '') | replace(\"'\", '') | replace('.', '') | truncate(60, False, '') }}"
+                },
+                "preserve_original": false
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "rss",
+                "transform"
+            ]
+        },
+        {
+            "export_id": 3,
+            "name": "Save to Dropbox",
+            "job_type": "dropbox_write_agent",
+            "description": "Writes each article as a .txt file in /rss-archive/. The filename is a date-prefixed slug derived from the article title. Add your Dropbox access token as a credential named dropbox_token before enabling.",
+            "config": {
+                "access_token": "{{credential:dropbox_token}}",
+                "path_template": "/rss-archive/{{ file_slug }}.txt",
+                "content_template": "{{ file_content }}",
+                "mode": "overwrite"
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "dropbox",
+                "action"
+            ]
+        }
+    ],
+    "links": [
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3}
+    ]
+}

@@ -1,0 +1,78 @@
+{
+    "schema_version": 1,
+    "exported_at": "2026-09-18T00:00:00+00:00",
+    "exported_by": "muninn",
+    "scenario": {
+        "name": "Dropbox Inbox Watcher",
+        "description": "Polls a Dropbox folder every 5 minutes for new file uploads and sends an email notification for each one. Requires one credential: dropbox_token.",
+        "color": "#0061FF",
+        "is_active": false
+    },
+    "agents": [
+        {
+            "export_id": 0,
+            "name": "Watch Dropbox Inbox",
+            "job_type": "dropbox_read_agent",
+            "description": "Polls /inbox every 5 minutes for new or modified files. Add your Dropbox access token as a credential named dropbox_token before enabling.",
+            "config": {
+                "access_token": "{{credential:dropbox_token}}",
+                "folder_path": "/inbox",
+                "read_content": false,
+                "max_files": 20
+            },
+            "schedule_cron": "*/5 * * * *",
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "dropbox",
+                "source"
+            ]
+        },
+        {
+            "export_id": 1,
+            "name": "Format File Notification",
+            "job_type": "template_agent",
+            "description": "Builds a subject line and plain-text body from the file metadata emitted by the read agent.",
+            "config": {
+                "templates": {
+                    "subject": "New file in Dropbox: {{ name }}",
+                    "body": "A new file arrived in your Dropbox inbox.\n\nName:     {{ name }}\nPath:     {{ path }}\nSize:     {{ size }} bytes\nModified: {{ server_modified }}\n\nLog in to Dropbox to view or move it."
+                },
+                "preserve_original": true
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "dropbox",
+                "transform"
+            ]
+        },
+        {
+            "export_id": 2,
+            "name": "Send Arrival Email",
+            "job_type": "email_agent",
+            "description": "Sends one email per new file. Change to_email to your address before enabling.",
+            "config": {
+                "to_email": "you@example.com",
+                "subject_template": "{{ subject }}",
+                "body_template": "{{ body }}"
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "dropbox",
+                "email",
+                "action"
+            ]
+        }
+    ],
+    "links": [
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2}
+    ]
+}

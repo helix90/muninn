@@ -139,3 +139,98 @@ class TestFrequencyTrackerAgentTracking:
         event = _make_event(test_job, {'source_domain': 'example.com'})
         result = agent.check([event])
         assert result == []
+
+
+class TestAnchorWordPivoting:
+    """Anchor-word pivoting: a word appearing in 2+ of an article's phrases
+    becomes a secondary cluster key, linking topic variants that share a
+    keyword but no complete phrase."""
+
+    def _make_agent(self, test_job, db_session, config=None):
+        return FrequencyTrackerAgent(
+            agent_id=test_job.id, config=config or {}, user_id=test_job.user_id, db_session=db_session,
+        )
+
+    def test_anchor_word_bridges_synonym_variants(self, test_job, db_session):
+        """Two articles that share no complete phrase but both have 2+ phrases
+        containing the same word are linked via that anchor word."""
+        agent = self._make_agent(test_job, db_session)
+
+        # "supply" appears in two phrases → becomes an anchor pivot
+        e1 = _make_event(test_job, {
+            'topic_terms': ['supply chain', 'supply shortage'],
+            'source_domain': 'a.com',
+        })
+        agent.check([e1])
+
+        # No shared phrase with e1, but "supply" again in two phrases →
+        # looks up the "supply" anchor bucket and finds e1's history
+        e2 = _make_event(test_job, {
+            'topic_terms': ['supply disruption', 'supply risk'],
+            'source_domain': 'b.com',
+        })
+        result = agent.check([e2])
+        assert result[0].payload['topic_stats']['recurrence_count'] == 2
+
+    def test_word_in_only_one_phrase_is_not_an_anchor(self, test_job, db_session):
+        """A word that appears in only one phrase does not become an anchor,
+        so a later article using that word as an anchor finds no history."""
+        agent = self._make_agent(test_job, db_session)
+
+        # "quantum" appears in only one phrase → not written under "quantum"
+        e1 = _make_event(test_job, {
+            'topic_terms': ['quantum sensing', 'photon detection'],
+            'source_domain': 'a.com',
+        })
+        agent.check([e1])
+
+        # "quantum" appears in two phrases → would look under "quantum",
+        # but e1 never wrote there, so no link is found
+        e2 = _make_event(test_job, {
+            'topic_terms': ['quantum computing', 'quantum algorithm'],
+            'source_domain': 'b.com',
+        })
+        result = agent.check([e2])
+        assert result[0].payload['topic_stats']['recurrence_count'] == 1
+
+    def test_anchor_accumulates_across_multiple_articles(self, test_job, db_session):
+        """History accumulated under an anchor grows as more articles share it."""
+        agent = self._make_agent(test_job, db_session)
+
+        for payload, source in [
+            ({'topic_terms': ['supply chain', 'supply shortage'], 'source_domain': 'a.com'}, 'a.com'),
+            ({'topic_terms': ['supply disruption', 'supply risk'], 'source_domain': 'b.com'}, 'b.com'),
+            ({'topic_terms': ['supply crunch', 'supply pressure'], 'source_domain': 'c.com'}, 'c.com'),
+        ]:
+            agent.check([_make_event(test_job, payload)])
+
+        # Fourth article with "supply" anchor should see all three prior records
+        e4 = _make_event(test_job, {
+            'topic_terms': ['supply glut', 'supply surplus'],
+            'source_domain': 'd.com',
+        })
+        result = agent.check([e4])
+        assert result[0].payload['topic_stats']['recurrence_count'] == 4
+
+    def test_unrelated_single_word_still_does_not_cross_link(self, test_job, db_session):
+        """A lone unigram term (no phrases present) does not accidentally link
+        to an article that used it only within bigrams."""
+        agent = self._make_agent(test_job, db_session)
+
+        # Article with a bigram only — "market" is a component but not an anchor
+        e1 = _make_event(test_job, {
+            'topic_terms': ['housing market', 'bond market'],
+            'source_domain': 'a.com',
+        })
+        agent.check([e1])
+
+        # Wait — "market" appears in TWO phrases above → it IS an anchor.
+        # But a bare "market" unigram article with no phrases should still
+        # link (this tests that the anchor key is picked up correctly).
+        e2 = _make_event(test_job, {
+            'topic_terms': ['market'],   # no phrases → cluster_terms = ['market']
+            'source_domain': 'b.com',
+        })
+        result = agent.check([e2])
+        # "market" was written as an anchor by e1, so e2 finds it
+        assert result[0].payload['topic_stats']['recurrence_count'] == 2

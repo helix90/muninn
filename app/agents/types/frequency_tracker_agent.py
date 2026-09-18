@@ -78,10 +78,25 @@ class FrequencyTrackerAgent(TransformAgent):
                          data={'event_id': event.id})
                 continue
 
-            # Only multi-word phrases are used to LINK history across articles;
-            # lone words are too likely to coincidentally recur. Fall back to
-            # all terms only if the article produced no phrases at all.
-            cluster_terms = [t for t in terms if ' ' in t] or terms
+            # Multi-word phrases are the primary cluster keys. Lone words are
+            # too likely to coincidentally recur, so they are only used as
+            # fallback when an article has no phrases at all.
+            #
+            # Anchor-word pivoting: a content word that appears in 2+ of this
+            # article's phrases is added as a secondary cluster key. This lets
+            # "supply chain risk" / "supply chain shortage" link via "supply"
+            # even when they share no complete phrase — bridging synonym
+            # variants without requiring an exact bigram match.
+            phrase_terms = [t for t in terms if ' ' in t]
+            if phrase_terms:
+                word_freq = {}
+                for phrase in phrase_terms:
+                    for word in phrase.split():
+                        word_freq[word] = word_freq.get(word, 0) + 1
+                anchor_words = [w for w, cnt in word_freq.items() if cnt >= 2]
+                cluster_terms = phrase_terms + anchor_words
+            else:
+                cluster_terms = terms
 
             source = (
                 event.get_payload_field('source_domain')

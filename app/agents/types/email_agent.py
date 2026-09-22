@@ -128,6 +128,7 @@ class EmailAgent(ActionAgent):
 
         sent_count = 0
         failed_count = 0
+        last_error = None
 
         for event in events:
             try:
@@ -193,11 +194,23 @@ class EmailAgent(ActionAgent):
                 })
                 if hasattr(self, '_test_mode_errors'):
                     self._test_mode_errors.append(str(e))
+                last_error = e
 
         self.log(f'Processed {len(events)} events', data={
             'sent_count': sent_count,
             'failed_count': failed_count
         })
+
+        if failed_count > 0 and sent_count == 0:
+            raise RuntimeError(
+                f'All {failed_count} email(s) failed to send. '
+                f'Last error: {last_error}'
+            )
+        elif failed_count > 0:
+            self.log(
+                f'{failed_count} of {len(events)} email(s) failed to send',
+                level='warning'
+            )
 
     def _render_template(self, template_str: str, data: Dict[str, Any]) -> str:
         """
@@ -258,24 +271,23 @@ class EmailAgent(ActionAgent):
             recipients: List of recipient addresses
             message: Email message object
         """
+        # Use sendmail() rather than send_message() so that BCC recipients
+        # in the `recipients` list are actually delivered — send_message()
+        # only reads the To/Cc headers and silently ignores BCC addresses.
+        raw = message.as_string()
         if use_tls:
-            # Use STARTTLS
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(username, password)
-                server.send_message(message)
+                server.sendmail(from_email, recipients, raw)
+        elif smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+                server.login(username, password)
+                server.sendmail(from_email, recipients, raw)
         else:
-            # Plain connection or SSL
-            if smtp_port == 465:
-                # Use SSL
-                with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
-                    server.login(username, password)
-                    server.send_message(message)
-            else:
-                # Plain connection
-                with smtplib.SMTP(smtp_server, smtp_port) as server:
-                    server.login(username, password)
-                    server.send_message(message)
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.login(username, password)
+                server.sendmail(from_email, recipients, raw)
 
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:

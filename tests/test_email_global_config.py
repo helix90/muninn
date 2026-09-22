@@ -267,7 +267,7 @@ class TestEmailAgentUsesGlobalConfig:
                 app.config['SMTP_USERNAME'],
                 app.config['SMTP_PASSWORD']
             )
-            mock_server.send_message.assert_called_once()
+            mock_server.sendmail.assert_called_once()
 
     @patch('app.agents.types.email_agent.smtplib.SMTP')
     def test_email_agent_uses_global_from_email(self, mock_smtp, app, db_session, test_user):
@@ -313,10 +313,9 @@ class TestEmailAgentUsesGlobalConfig:
             # Send email
             agent.act([event])
 
-            # Verify message has correct From header
-            call_args = mock_server.send_message.call_args
-            message = call_args[0][0]
-            assert message['From'] == 'noreply@example.com'
+            # Verify sendmail was called with the global from_email as sender
+            call_args = mock_server.sendmail.call_args
+            assert call_args[0][0] == 'noreply@example.com'
 
 
 class TestEmailAgentTemplating:
@@ -368,24 +367,23 @@ class TestEmailAgentTemplating:
             # Send email
             agent.act([event])
 
-            # Verify template rendering
-            call_args = mock_server.send_message.call_args
-            message = call_args[0][0]
+            # Verify template rendering — parse the raw message string passed to sendmail
+            import email as email_module
+            call_args = mock_server.sendmail.call_args
+            raw = call_args[0][2]
+            message = email_module.message_from_string(raw)
 
             assert message['Subject'] == 'Alert: Database Error - HIGH'
             # Check body contains rendered template
             payload = message.get_payload()
             if isinstance(payload, list):
-                body = payload[0].get_payload()
+                body = payload[0].get_payload(decode=True).decode('utf-8')
             else:
-                body = payload
-
-            # Decode Base64 if encoded
-            if isinstance(body, str):
-                try:
-                    body = base64.b64decode(body).decode('utf-8')
-                except:
-                    pass  # If not Base64, use as-is
+                body = message.get_payload(decode=True)
+                if body:
+                    body = body.decode('utf-8')
+                else:
+                    body = payload
 
             assert 'Issue: Database Error' in body
             assert 'Connection timeout' in body
@@ -436,10 +434,11 @@ class TestEmailAgentTemplating:
             # Send email
             agent.act([event])
 
-            # Verify recipient was rendered from template
-            call_args = mock_server.send_message.call_args
-            message = call_args[0][0]
-            assert message['To'] == 'dynamic@example.com'
+            # Verify recipient was rendered from template — check the recipients
+            # list passed to sendmail (index 1), not the To header
+            call_args = mock_server.sendmail.call_args
+            recipients = call_args[0][1]
+            assert 'dynamic@example.com' in recipients
 
 
 class TestEmailAgentConfigSchema:

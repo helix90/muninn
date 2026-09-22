@@ -9,7 +9,7 @@ Useful for injecting test data into a pipeline without waiting for a real
 source, or for one-off manual triggers during development and debugging.
 """
 
-from typing import List
+from typing import Any, Dict, List
 
 from app.agents.base import SourceAgent
 from app.agents.registry import register_agent
@@ -44,3 +44,21 @@ class ManualEventAgent(SourceAgent):
         payload = dict(self.config['payload'])
         self.log('Emitting manual event', data={'payload_keys': list(payload.keys())})
         return [self.create_event(payload=payload)]
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        schema = super().get_config_schema()
+        schema['required_fields'] = []
+        schema['optional_fields'] = [
+            {
+                'name': 'payload',
+                'type': 'textarea',
+                'description': (
+                    'JSON object to emit as the event payload. '
+                    'Must be a valid JSON object — e.g. {"title": "test", "value": 42}. '
+                    'These fields are available as template variables in downstream agents.'
+                ),
+                'placeholder': '{\n  "title": "My Event",\n  "data": "example value"\n}',
+            },
+        ] + schema['optional_fields']
+        return schema

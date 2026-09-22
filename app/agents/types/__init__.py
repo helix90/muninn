@@ -11,6 +11,7 @@ Source Agents:
 - MqttSubscriberAgent: Subscribe to MQTT topics (Mosquitto-compatible)
 - DataStoreReadAgent: Emit events from the shared DataStore
 - DropboxReadAgent: Monitor a Dropbox folder for new or modified files
+- ManualEventAgent: Emit a user-defined payload on demand via Run Now
 
 Transform Agents:
 - FilterAgent: Rule-based filtering
@@ -51,6 +52,7 @@ from app.agents.types.webhook_agent import WebhookAgent
 from app.agents.types.mqtt_subscriber_agent import MqttSubscriberAgent
 from app.agents.types.datastore_read_agent import DataStoreReadAgent
 from app.agents.types.dropbox_read_agent import DropboxReadAgent
+from app.agents.types.manual_event_agent import ManualEventAgent
 
 # Import transform agents
 from app.agents.types.filter_agent import FilterAgent
@@ -91,6 +93,7 @@ __all__ = [
     'MqttSubscriberAgent',
     'DataStoreReadAgent',
     'DropboxReadAgent',
+    'ManualEventAgent',
     # Transform agents
     'FilterAgent',
     'DeduplicationAgent',

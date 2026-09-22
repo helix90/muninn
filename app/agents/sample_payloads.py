@@ -32,6 +32,7 @@ SAMPLE_PAYLOADS = {
     "jabber_listener_agent":    {"from": "user@example.com", "body": "Hello!"},
     "s3_bucket_monitor_agent":  {"bucket": "my-bucket", "key": "uploads/file.csv", "size": 1024},
     "dropbox_read_agent":       {"name": "report.csv", "path": "/reports/report.csv", "size": 2048, "server_modified": "2026-09-18T09:00:00Z", "rev": "abc123", "id": "id:abc123"},
+    "manual_event_agent":       _GENERIC,
 
     # Transform agents
     "filter_agent":             _RSS_ITEM,

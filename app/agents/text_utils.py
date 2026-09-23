@@ -29,6 +29,34 @@ where's which while who who's whom why why's with won't would
 wouldn't you you'd you'll you're you've your yours yourself
 yourselves new says say said gets get got via using use used just
 like really also one two three first last new old big small
+
+tell told tells telling tells reveal reveals revealed revealing
+confirm confirms confirmed says report reports reported reporting
+warn warns warned warning claim claims claimed according
+discover discovers discovered discovering show shows showed shown
+find finds found finding announce announces announced announcing
+call calls called calling make makes made making take takes took
+taking give gives gave given come comes came coming goes went gone
+return returns returned returning repeat repeats repeated
+defend defends defended defending vote votes voted voting
+deny denies denied plan plans planned planning
+
+system systems history world nation nations national global
+international local regional country countries people person
+group groups area areas place places thing things part parts
+point points number numbers issue issues question questions
+problem problems solution solutions update updates result results
+example examples fact facts case cases kind kinds type types
+way ways time times year years month months week weeks day days
+period periods level levels set sets list lists
+
+novel major key top large small high low long short recent
+current latest former former past next main general major minor
+early late great good best known official public private
+brief full total complete entire single multiple various
+
+american british french german chinese russian italian japanese
+korean indian canadian australian european asian african latin
 """.split())
 
 _WORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9'\-]{2,}")

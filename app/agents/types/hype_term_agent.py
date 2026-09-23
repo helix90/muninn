@@ -28,6 +28,9 @@ class HypeTermAgent(TransformAgent):
         source_fields (list): payload fields to read text from (default: ['title'])
         top_n_terms (int): number of terms to keep in the snapshot (default: 25)
         min_term_length (int): minimum word length to consider (default: 4)
+        blocklist (list): additional terms to always exclude from the snapshot,
+            e.g. ["energy", "windows"] for domain-specific noise you want
+            suppressed regardless of their frequency. Case-insensitive.
     """
 
     agent_type = 'hype_term_agent'
@@ -48,6 +51,12 @@ class HypeTermAgent(TransformAgent):
             if not isinstance(self.config['source_fields'], list) or not self.config['source_fields']:
                 raise ValueError("'source_fields' must be a non-empty list")
 
+        if 'blocklist' in self.config:
+            if not isinstance(self.config['blocklist'], list):
+                raise ValueError("'blocklist' must be a list of strings")
+            if not all(isinstance(t, str) for t in self.config['blocklist']):
+                raise ValueError("all 'blocklist' entries must be strings")
+
     def process(self, events: List[Event]) -> List[Event]:
         if not events:
             return []
@@ -55,6 +64,7 @@ class HypeTermAgent(TransformAgent):
         source_fields = self.config.get('source_fields', ['title'])
         top_n = self.config.get('top_n_terms', 25)
         min_length = self.config.get('min_term_length', 4)
+        blocklist = {t.lower() for t in self.config.get('blocklist', [])}
 
         # Document frequency: how many DISTINCT items mention each term this
         # run, not raw word count - one wordy article shouldn't dominate.
@@ -68,7 +78,10 @@ class HypeTermAgent(TransformAgent):
             terms = document_term_set(text, min_length=min_length)
             doc_frequency.update(terms)
 
-        top_terms = [term for term, _ in doc_frequency.most_common(top_n)]
+        top_terms = [
+            term for term, _ in doc_frequency.most_common(top_n + len(blocklist))
+            if term not in blocklist
+        ][:top_n]
 
         payload = {
             'hype_terms': top_terms,

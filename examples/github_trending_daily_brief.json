@@ -1,0 +1,97 @@
+{
+    "schema_version": 1,
+    "exported_at": "2026-09-24T00:00:00+00:00",
+    "exported_by": "muninn",
+    "scenario": {
+        "name": "GitHub Trending Daily Brief",
+        "description": "Checks GitHub Trending each morning and sends one email per newly-trending repository that gained 50+ stars that day. Agent memory ensures each repo is only reported once (it won't re-appear on subsequent days unless it re-enters the trending list after the 2-day TTL expires). Adjust the language filter, star threshold, and recipient address to taste.",
+        "color": "#24292e",
+        "is_active": false
+    },
+    "agents": [
+        {
+            "export_id": 0,
+            "name": "Fetch GitHub Trending",
+            "job_type": "github_trending_agent",
+            "description": "Scrapes https://github.com/trending each morning for newly-trending repositories. Leave language blank to monitor all languages, or set it to a slug like 'python', 'typescript', 'rust'. Runs daily at 08:00.",
+            "config": {
+                "language": "",
+                "since": "daily",
+                "max_repos": 25
+            },
+            "schedule_cron": "0 8 * * *",
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "github",
+                "source"
+            ]
+        },
+        {
+            "export_id": 1,
+            "name": "Filter High-Momentum Repos",
+            "job_type": "filter_agent",
+            "description": "Keeps only repositories that gained 50 or more stars today, discarding low-activity entries. Raise or lower this threshold to adjust sensitivity.",
+            "config": {
+                "rules": [
+                    {"field": "stars_today", "type": "greater_than", "value": 50}
+                ]
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "github",
+                "transform"
+            ]
+        },
+        {
+            "export_id": 2,
+            "name": "Format Notification",
+            "job_type": "template_agent",
+            "description": "Builds a subject line and plain-text email body from the repository metadata.",
+            "config": {
+                "templates": {
+                    "subject": "Trending on GitHub: {{ name }}{% if language %} ({{ language }}){% endif %} — {{ stars_today }} stars today",
+                    "body": "{{ description | default('No description provided.') }}\n\n{{ url }}\n\nOwner:       {{ owner }}\nLanguage:    {{ language | default('—') }}\nStars today: {{ stars_today }}"
+                },
+                "preserve_original": true
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "github",
+                "transform"
+            ]
+        },
+        {
+            "export_id": 3,
+            "name": "Send Email",
+            "job_type": "email_agent",
+            "description": "Sends one email per qualifying repository. Change to_email to your address before enabling.",
+            "config": {
+                "to_email": "you@example.com",
+                "subject_template": "{{ subject }}",
+                "body_template": "{{ body }}"
+            },
+            "schedule_cron": null,
+            "schedule_enabled": false,
+            "is_active": true,
+            "priority": 0,
+            "tags": [
+                "github",
+                "email",
+                "action"
+            ]
+        }
+    ],
+    "links": [
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3}
+    ]
+}

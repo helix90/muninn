@@ -12,6 +12,7 @@ Source Agents:
 - DataStoreReadAgent: Emit events from the shared DataStore
 - DropboxReadAgent: Monitor a Dropbox folder for new or modified files
 - ManualEventAgent: Emit a user-defined payload on demand via Run Now
+- GitHubTrendingAgent: Scrape GitHub Trending for newly-trending repositories
 
 Transform Agents:
 - FilterAgent: Rule-based filtering
@@ -53,6 +54,7 @@ from app.agents.types.mqtt_subscriber_agent import MqttSubscriberAgent
 from app.agents.types.datastore_read_agent import DataStoreReadAgent
 from app.agents.types.dropbox_read_agent import DropboxReadAgent
 from app.agents.types.manual_event_agent import ManualEventAgent
+from app.agents.types.github_trending_agent import GitHubTrendingAgent
 
 # Import transform agents
 from app.agents.types.filter_agent import FilterAgent
@@ -94,6 +96,7 @@ __all__ = [
     'DataStoreReadAgent',
     'DropboxReadAgent',
     'ManualEventAgent',
+    'GitHubTrendingAgent',
     # Transform agents
     'FilterAgent',
     'DeduplicationAgent',

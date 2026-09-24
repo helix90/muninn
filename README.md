@@ -13,7 +13,7 @@ Named after one of Odin's ravens, Muninn ("memory") keeps watch so you don't hav
 
 ## Features
 
-- **34 built-in agent types** — sources, transforms, and actions covering RSS, HTTP, email, IMAP, MQTT, S3, Dropbox, Slack, Telegram, Discord, Jabber, webhooks, and more
+- **35 built-in agent types** — sources, transforms, and actions covering RSS, HTTP, email, IMAP, MQTT, S3, Dropbox, GitHub, Slack, Telegram, Discord, Jabber, webhooks, and more
 - **Scenario editor** — visual pipeline canvas for connecting agents; export/import scenarios as portable JSON
 - **Credential vault** — encrypted credential storage with `{{credential:name}}` templating in agent configs; importable/exportable
 - **REST API** — full CRUD for agents, events, and scenarios behind Bearer token auth (`/api/v1/`)
@@ -47,6 +47,7 @@ Fetch data from external sources on a schedule.
 | `datastore_read_agent` | Read key-value data from the shared DataStore |
 | `dropbox_read_agent` | Monitor a Dropbox folder for new or modified files |
 | `manual_event_agent` | Emit a custom JSON payload on demand via the Run Now button |
+| `github_trending_agent` | Emit one event per newly-trending GitHub repository (daily/weekly/monthly) |
 
 ### Transform Agents
 Receive events from upstream agents, reshape the data, and pass results downstream.
@@ -326,7 +327,7 @@ Tests use a separate `muninn_test` database. Each test truncates tables via `DEL
 muninn/
 ├── app/
 │   ├── agents/
-│   │   ├── types/              # 34 agent implementations
+│   │   ├── types/              # 35 agent implementations
 │   │   ├── base.py             # SourceAgent / TransformAgent / ActionAgent base classes
 │   │   ├── registry.py         # Agent type registry
 │   │   └── test_runner.py      # Manual test mode (ephemeral, non-persisting)

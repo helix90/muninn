@@ -33,6 +33,7 @@ SAMPLE_PAYLOADS = {
     "s3_bucket_monitor_agent":  {"bucket": "my-bucket", "key": "uploads/file.csv", "size": 1024},
     "dropbox_read_agent":       {"name": "report.csv", "path": "/reports/report.csv", "size": 2048, "server_modified": "2026-09-18T09:00:00Z", "rev": "abc123", "id": "id:abc123"},
     "manual_event_agent":       _GENERIC,
+    "github_trending_agent":    {"repo": "owner/awesome-project", "owner": "owner", "name": "awesome-project", "title": "owner/awesome-project", "url": "https://github.com/owner/awesome-project", "description": "An awesome open source project.", "language": "Python", "stars_today": 312, "since": "daily"},
 
     # Transform agents
     "filter_agent":             _RSS_ITEM,

@@ -95,3 +95,35 @@ class HypeTermAgent(TransformAgent):
         })
 
         return [self.create_event(payload=payload, metadata=metadata)]
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = []
+        schema['optional_fields'] = [
+            {
+                'name': 'top_n_terms',
+                'type': 'number',
+                'default': 25,
+                'description': 'Number of hype terms to keep in the snapshot. Raise to 40-50 now that bigrams are included.',
+            },
+            {
+                'name': 'min_term_length',
+                'type': 'number',
+                'default': 4,
+                'description': 'Minimum character length for a word to be considered.',
+            },
+            {
+                'name': 'source_fields',
+                'type': 'text',
+                'default': 'title',
+                'description': 'Comma-separated payload fields to read text from (e.g. "title" or "title,summary").',
+            },
+            {
+                'name': 'blocklist',
+                'type': 'textarea',
+                'description': 'JSON array of terms to always exclude from the snapshot regardless of frequency, e.g. ["windows", "energy"].',
+                'placeholder': '["windows", "energy"]',
+            },
+        ] + schema['optional_fields']
+        return schema

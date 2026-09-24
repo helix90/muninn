@@ -143,3 +143,35 @@ class SignalScoreAgent(TransformAgent):
             return []
 
         return state.get('terms', [])
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = []
+        schema['optional_fields'] = [
+            {
+                'name': 'max_distinct_sources_48h',
+                'type': 'number',
+                'default': 4,
+                'description': 'Drop topics covered by more than this many distinct sources in the last 48h (higher = less strict hype filter).',
+            },
+            {
+                'name': 'min_recurrences',
+                'type': 'number',
+                'default': 2,
+                'description': 'Minimum number of mentions within the tracking window to be considered persistent.',
+            },
+            {
+                'name': 'min_span_days',
+                'type': 'number',
+                'default': 10,
+                'description': 'Mentions must span at least this many days. Lower to 2–3 on a new installation with limited history.',
+            },
+            {
+                'name': 'hype_terms_max_age_hours',
+                'type': 'number',
+                'default': 6,
+                'description': 'Treat a cached hype snapshot as stale after this many hours.',
+            },
+        ] + schema['optional_fields']
+        return schema

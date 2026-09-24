@@ -110,3 +110,21 @@ class DropboxWriteAgent(ActionAgent):
             return Template(template_str).render(**data)
         except UndefinedError as e:
             return f'[Template Error: {e}]'
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = ['access_token', 'path_template', 'content_template']
+        schema['optional_fields'] = [
+            {
+                'name': 'mode',
+                'type': 'select',
+                'default': 'overwrite',
+                'description': 'How to handle an existing file at the destination path.',
+                'options': [
+                    {'value': 'overwrite', 'label': 'Overwrite — replace existing file'},
+                    {'value': 'add', 'label': 'Add — auto-rename to avoid collision'},
+                ],
+            },
+        ] + schema['optional_fields']
+        return schema

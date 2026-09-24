@@ -166,3 +166,23 @@ class FrequencyTrackerAgent(TransformAgent):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = []
+        schema['optional_fields'] = [
+            {
+                'name': 'window_days',
+                'type': 'number',
+                'default': 14,
+                'description': 'Rolling window in days — mentions older than this are dropped from history.',
+            },
+            {
+                'name': 'max_records_per_topic',
+                'type': 'number',
+                'default': 200,
+                'description': 'Maximum history records stored per topic cluster.',
+            },
+        ] + schema['optional_fields']
+        return schema

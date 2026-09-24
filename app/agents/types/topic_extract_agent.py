@@ -84,3 +84,29 @@ class TopicExtractAgent(TransformAgent):
 
         self.log(f'Extracted topics for {len(output_events)}/{len(events)} events')
         return output_events
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = []
+        schema['optional_fields'] = [
+            {
+                'name': 'max_topics_per_item',
+                'type': 'number',
+                'default': 3,
+                'description': 'Maximum topic terms to extract per article.',
+            },
+            {
+                'name': 'min_term_length',
+                'type': 'number',
+                'default': 4,
+                'description': 'Minimum character length for a word to be considered as a topic term.',
+            },
+            {
+                'name': 'source_fields',
+                'type': 'text',
+                'default': 'title, summary',
+                'description': 'Comma-separated payload fields to extract topics from.',
+            },
+        ] + schema['optional_fields']
+        return schema

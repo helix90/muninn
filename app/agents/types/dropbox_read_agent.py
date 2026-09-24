@@ -150,3 +150,28 @@ class DropboxReadAgent(SourceAgent):
             level='warning',
         )
         return None
+
+    @classmethod
+    def get_config_schema(cls):
+        schema = super().get_config_schema()
+        schema['required_fields'] = ['access_token', 'folder_path']
+        schema['optional_fields'] = [
+            {
+                'name': 'read_content',
+                'type': 'checkbox',
+                'default': False,
+                'description': 'Download and include file text content in the event payload.',
+            },
+            {
+                'name': 'file_filter',
+                'type': 'text',
+                'description': 'Only emit events for files whose names contain this substring (case-insensitive), e.g. ".csv".',
+            },
+            {
+                'name': 'max_files',
+                'type': 'number',
+                'default': 50,
+                'description': 'Maximum number of new files to emit per run.',
+            },
+        ] + schema['optional_fields']
+        return schema

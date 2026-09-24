@@ -110,8 +110,18 @@ def top_terms_for_document(text, max_terms=3, min_length=4, stopwords=None):
 
 
 def document_term_set(text, min_length=4, stopwords=None):
-    """Unique terms in one document - for corpus-level document-frequency counting."""
-    return set(tokenize(text, min_length=min_length, stopwords=stopwords))
+    """Unique unigrams and bigrams in one document, for corpus-level
+    document-frequency counting.
+
+    Bigrams are included so HypeTermAgent's snapshot captures the same
+    two-word phrases that TopicExtractAgent emits as topic_terms. Without
+    bigrams, a phrase like 'agent skills' could slip past the hype check
+    even when both constituent words individually fail to rank in the top-N
+    unigrams — the phrase-level signal is missed entirely.
+    """
+    words = tokenize(text, min_length=min_length, stopwords=stopwords)
+    bigrams = {f'{a} {b}' for a, b in zip(words, words[1:])}
+    return set(words) | bigrams
 
 
 def domain_from_url(url):

@@ -5,6 +5,7 @@ Single responsibility: ONLY fetch and parse RSS feeds.
 Does NOT filter or apply rules (that's FilterAgent's job).
 """
 
+import html as _html
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import feedparser
@@ -111,11 +112,11 @@ class RSSAgent(SourceAgent):
 
                 # Create event payload
                 payload = {
-                    'title': entry.get('title', ''),
+                    'title': _html.unescape(entry.get('title', '')),
                     'link': entry.get('link', ''),
-                    'summary': entry.get('summary', ''),
+                    'summary': _html.unescape(entry.get('summary', '')),
                     'published': published.isoformat() if published else None,
-                    'author': entry.get('author', ''),
+                    'author': _html.unescape(entry.get('author', '')),
                     'id': article_id,
                 }
 

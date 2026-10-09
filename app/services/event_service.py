@@ -85,8 +85,12 @@ class EventService:
             'propagation_id': propagation_id,
         }
 
+        # Determine the source agent from the events (all share the same agent_id)
+        source_agent_id = events[0].agent_id if events else None
+
         # Start propagation from depth 0
         self._propagate_recursive(
+            source_agent_id=source_agent_id,
             events=events,
             depth=0,
             stats=stats,
@@ -98,6 +102,7 @@ class EventService:
 
     def _propagate_recursive(
         self,
+        source_agent_id: int,
         events: List[Event],
         depth: int,
         stats: Dict[str, Any],
@@ -108,82 +113,70 @@ class EventService:
         Recursively propagate events through agent network.
 
         Args:
+            source_agent_id: ID of the agent that produced these events.
+                Routing uses this value — NOT event.agent_id — so that
+                pass-through agents (Filter, Deduplication) which return
+                the original event objects without creating new ones are
+                still routed correctly.
             events: Events to propagate
             depth: Current recursion depth
             stats: Statistics dict to update
             visited_agent_ids: Set of agent IDs already visited in this path
         """
-        # Check max depth
         if depth >= self.max_depth:
             stats['max_depth_reached'] = True
             logger.warning(f'Max propagation depth ({self.max_depth}) reached')
             return
 
-        if not events:
+        if not events or source_agent_id is None:
             return
 
-        # Group events by source agent
-        events_by_agent = {}
-        for event in events:
-            agent_id = event.agent_id
-            if agent_id not in events_by_agent:
-                events_by_agent[agent_id] = []
-            events_by_agent[agent_id].append(event)
+        downstream_agents = self._get_downstream_agents(source_agent_id)
 
-        # For each source agent, find and execute downstream agents
-        for source_agent_id, agent_events in events_by_agent.items():
-            # Get downstream agents
-            downstream_agents = self._get_downstream_agents(source_agent_id)
+        if not downstream_agents:
+            stats['events_propagated'] += len(events)
+            return
 
-            if not downstream_agents:
-                # No downstream agents, events end here
-                stats['events_propagated'] += len(agent_events)
+        for target_agent in downstream_agents:
+            target_agent_id = target_agent.id
+
+            if target_agent_id in visited_agent_ids:
+                logger.warning(
+                    f'Cycle detected: agent {target_agent_id} already visited, skipping'
+                )
                 continue
 
-            # Execute each downstream agent with the events
-            for target_agent in downstream_agents:
-                target_agent_id = target_agent.id
+            try:
+                new_events = self._execute_agent(
+                    target_agent, events, propagation_id=propagation_id
+                )
 
-                # Skip if this creates a cycle
-                if target_agent_id in visited_agent_ids:
-                    logger.warning(
-                        f'Cycle detected: agent {target_agent_id} already visited, skipping'
+                stats['agents_executed'] += 1
+                stats['agent_execution_counts'][target_agent_id] = \
+                    stats['agent_execution_counts'].get(target_agent_id, 0) + 1
+                stats['events_propagated'] += len(events)
+
+                if new_events:
+                    stats['events_created'] += len(new_events)
+
+                    new_visited = visited_agent_ids.copy()
+                    new_visited.add(target_agent_id)
+
+                    self._propagate_recursive(
+                        source_agent_id=target_agent_id,
+                        events=new_events,
+                        depth=depth + 1,
+                        stats=stats,
+                        visited_agent_ids=new_visited,
+                        propagation_id=propagation_id,
                     )
-                    continue
 
-                # Execute the agent
-                try:
-                    new_events = self._execute_agent(
-                        target_agent, agent_events, propagation_id=propagation_id
-                    )
-
-                    # Update statistics
-                    stats['agents_executed'] += 1
-                    stats['agent_execution_counts'][target_agent_id] = \
-                        stats['agent_execution_counts'].get(target_agent_id, 0) + 1
-                    stats['events_propagated'] += len(agent_events)
-
-                    if new_events:
-                        stats['events_created'] += len(new_events)
-
-                        # Recursively propagate new events
-                        new_visited = visited_agent_ids.copy()
-                        new_visited.add(target_agent_id)
-
-                        self._propagate_recursive(
-                            events=new_events,
-                            depth=depth + 1,
-                            stats=stats,
-                            visited_agent_ids=new_visited,
-                            propagation_id=propagation_id,
-                        )
-
-                except Exception as e:
-                    logger.error(
-                        f'Error executing agent {target_agent_id}: {e}',
-                        exc_info=True
-                    )
-                    # Continue with other agents even if one fails
+            except Exception as e:
+                logger.error(
+                    f'Error executing agent {target_agent_id}: {e}',
+                    exc_info=True
+                )
+                # Continue with other downstream agents even if one fails
 
     def _get_downstream_agents(self, source_agent_id: int) -> List:
         """
@@ -291,16 +284,20 @@ class EventService:
         try:
             new_events = agent.check(events)
 
-            # Update agent_id for all returned events to reflect the processing agent
-            # and persist new events to database
+            # Persist output events and stamp propagation_id.
+            # Only overwrite agent_id/agent_type for brand-new events (id is None
+            # before flush). Pass-through events returned by Filter/Deduplication
+            # already have an id — mutating their agent_id would corrupt the source
+            # agent's own deduplication lookups and break pipeline-trace attribution.
             if new_events:
                 for event in new_events:
-                    event.agent_id = agent_model.id
-                    event.agent_type = agent_model.job_type
+                    if event.id is None:
+                        event.agent_id = agent_model.id
+                        event.agent_type = agent_model.job_type
                     if propagation_id is not None:
                         event.propagation_id = propagation_id
                     self.db_session.add(event)
-                self.db_session.flush()  # Get event IDs
+                self.db_session.flush()  # Assign IDs to new events
 
                 # Update agent_run with output event IDs
                 agent_run.output_event_ids = [e.id for e in new_events]

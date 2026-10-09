@@ -125,7 +125,7 @@ class TestEndToEndScenarios:
             assert stats['events_created'] >= 2  # Filtered Python events
 
             # Verify emails were sent (2 Python articles)
-            assert mock_smtp_instance.send_message.call_count == 2
+            assert mock_smtp_instance.sendmail.call_count == 2
 
     @patch('app.agents.types.web_fetch_agent.requests.get')
     def test_web_fetch_to_html_parser_to_dedupe(self, mock_get, app, test_job):

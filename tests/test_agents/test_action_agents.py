@@ -4,6 +4,7 @@ Tests for Action Agents
 Tests EmailAgent, HTTPPostAgent, JabberAgent, and DiscordWebhookAgent.
 """
 
+import email as email_lib
 import pytest
 from unittest.mock import Mock, patch, MagicMock, call
 import smtplib
@@ -237,7 +238,7 @@ def test_email_agent_sends_email(mock_smtp, app_context, test_job, db_session, s
     assert result == []
 
     # Should have sent 2 emails
-    assert mock_server.send_message.call_count == 2
+    assert mock_server.sendmail.call_count == 2
 
     # Verify SMTP connection used global config values
     mock_smtp.assert_called_with(
@@ -281,10 +282,11 @@ def test_email_agent_template_rendering(mock_smtp, test_job, db_session, sample_
     assert result == []
 
     # Verify message was sent
-    assert mock_server.send_message.call_count == 1
+    assert mock_server.sendmail.call_count == 1
 
-    # Get the message that was sent
-    sent_message = mock_server.send_message.call_args[0][0]
+    # Get the message that was sent (sendmail receives from, recipients, raw_string)
+    raw = mock_server.sendmail.call_args[0][2]
+    sent_message = email_lib.message_from_string(raw)
 
     # Verify subject was rendered correctly
     assert sent_message['Subject'] == '[HIGH] System Alert'
@@ -320,7 +322,7 @@ def test_email_agent_multiple_recipients(mock_smtp, test_job, db_session, sample
     result = agent.check([sample_events[0]])
 
     assert result == []
-    assert mock_server.send_message.call_count == 1
+    assert mock_server.sendmail.call_count == 1
 
 
 @patch('app.agents.types.email_agent.smtplib.SMTP')
@@ -346,11 +348,10 @@ def test_email_agent_error_handling(mock_smtp, test_job, db_session, sample_even
     # Mock SMTP to raise an error
     mock_smtp.return_value.__enter__.side_effect = smtplib.SMTPException("Connection failed")
 
-    # Process events - should not raise exception
-    result = agent.check(sample_events)
-
-    # Should still return empty list
-    assert result == []
+    # EmailAgent raises RuntimeError when all emails fail (so the pipeline
+    # marks the agent run as failed rather than silently swallowing errors)
+    with pytest.raises(RuntimeError, match='failed to send'):
+        agent.check(sample_events)
 
 
 # ============================================================================

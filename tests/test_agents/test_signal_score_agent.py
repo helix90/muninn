@@ -131,3 +131,110 @@ class TestSignalScoreAgentCandidateScoring:
         event = _make_event(test_job, {'topic_terms': ['x']})
         result = agent.check([event])
         assert result == []
+
+
+class TestSignalScoreAgentHypeMerging:
+    def _make_agent(self, test_job, db_session, config=None):
+        return SignalScoreAgent(
+            agent_id=test_job.id, config=config or {}, user_id=test_job.user_id, db_session=db_session,
+        )
+
+    def _snapshot(self, test_job, terms):
+        return _make_event(test_job, {'hype_terms': terms}, metadata={'event_kind': 'hype_snapshot'})
+
+    def test_snapshots_from_multiple_feeds_are_merged(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session)
+        agent.check([self._snapshot(test_job, ['quantum computing'])])
+        agent.check([self._snapshot(test_job, ['battery recycling'])])
+        assert agent.check([_candidate(test_job, 'quantum computing')]) == []
+        assert agent.check([_candidate(test_job, 'battery recycling')]) == []
+
+    def test_terms_expire_individually(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'hype_terms_max_age_hours': 6})
+        old = (datetime.now(timezone.utc) - timedelta(hours=10)).isoformat()
+        agent.memory.set('hype_terms_state', {
+            'terms': ['old story'], 'term_seen': {'old story': old}, 'updated_at': old,
+        })
+        agent.check([self._snapshot(test_job, ['fresh story'])])
+        assert agent.memory.get('hype_terms_state')['terms'] == ['fresh story']
+        assert len(agent.check([_candidate(test_job, 'old story')])) == 1
+        assert agent.check([_candidate(test_job, 'fresh story')]) == []
+
+
+class TestSignalScoreAgentHypeMatching:
+    def _agent_with_hype(self, test_job, db_session, terms, config=None):
+        agent = SignalScoreAgent(
+            agent_id=test_job.id, config=config or {}, user_id=test_job.user_id, db_session=db_session,
+        )
+        agent.memory.set('hype_terms_state', {
+            'terms': terms, 'updated_at': datetime.now(timezone.utc).isoformat(),
+        })
+        return agent
+
+    def _with_terms(self, test_job, terms):
+        event = _candidate(test_job, terms[0])
+        event.payload = {**event.payload, 'topic_terms': terms}
+        return event
+
+    def test_phrase_built_from_hype_words_is_hype(self, test_job, db_session):
+        agent = self._agent_with_hype(test_job, db_session, ['openai', 'model'])
+        assert agent.check([_candidate(test_job, 'openai model')]) == []
+
+    def test_single_incidental_overlap_does_not_drop(self, test_job, db_session):
+        agent = self._agent_with_hype(test_job, db_session, ['open source'])
+        event = self._with_terms(test_job, [
+            'water utilities', 'leak detection', 'open source', 'acoustic sensors',
+        ])
+        assert len(agent.check([event])) == 1
+
+    def test_majority_overlap_drops(self, test_job, db_session):
+        agent = self._agent_with_hype(test_job, db_session, ['open source', 'rust compiler'])
+        event = self._with_terms(test_job, ['leak detection', 'open source', 'rust compiler'])
+        assert agent.check([event]) == []
+
+    def test_strict_overlap_threshold(self, test_job, db_session):
+        agent = self._agent_with_hype(test_job, db_session, ['open source'], {'max_hype_overlap': 0.25})
+        event = self._with_terms(test_job, [
+            'water utilities', 'leak detection', 'open source', 'acoustic sensors',
+        ])
+        assert agent.check([event]) == []
+
+    def test_invalid_overlap_rejected(self, test_job, db_session):
+        with pytest.raises(ValueError, match='max_hype_overlap'):
+            SignalScoreAgent(agent_id=test_job.id, config={'max_hype_overlap': 0},
+                             user_id=test_job.user_id, db_session=db_session)
+
+
+class TestSignalScoreAgentHypeLanguageAndCooldown:
+    def _make_agent(self, test_job, db_session, config=None):
+        return SignalScoreAgent(
+            agent_id=test_job.id, config=config or {}, user_id=test_job.user_id, db_session=db_session,
+        )
+
+    def test_oversold_item_dropped(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session)
+        event = _candidate(test_job, 'battery chemistry')
+        event.payload = {**event.payload, 'hype_language': ['revolutionary', 'game-changing']}
+        assert agent.check([event]) == []
+
+    def test_single_hype_word_tolerated_by_default(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session)
+        event = _candidate(test_job, 'battery chemistry')
+        event.payload = {**event.payload, 'hype_language': ['breakthrough']}
+        assert len(agent.check([event])) == 1
+
+    def test_cooldown_suppresses_same_cluster(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'resurface_cooldown_days': 7})
+        first = _candidate(test_job, 'leak detection')
+        first.payload = {**first.payload, 'topic_cluster_terms': ['leak detection', 'water utilities', 'water']}
+        second = _candidate(test_job, 'water utilities')
+        second.payload = {**second.payload, 'topic_cluster_terms': ['water utilities', 'water']}
+        unrelated = _candidate(test_job, 'water rights')
+        unrelated.payload = {**unrelated.payload, 'topic_cluster_terms': ['water rights', 'water']}
+        result = agent.check([first, second, unrelated])
+        assert [e.payload['topic_key'] for e in result] == ['leak detection', 'water rights']
+
+    def test_no_cooldown_by_default(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session)
+        result = agent.check([_candidate(test_job, 'leak detection'), _candidate(test_job, 'leak detection')])
+        assert len(result) == 2

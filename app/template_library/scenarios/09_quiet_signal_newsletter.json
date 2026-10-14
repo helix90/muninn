@@ -88,7 +88,7 @@
       "export_id": 7,
       "name": "Topic Extract",
       "job_type": "topic_extract_agent",
-      "description": "Custom agent - naive keyword/phrase extraction, no ML.",
+      "description": "Custom agent - naive keyword/phrase extraction, no ML. Strips HTML/feed boilerplate and flags promotional language in hype_language.",
       "config": {"source_fields": ["title", "summary"], "max_topics_per_item": 5, "min_term_length": 4},
       "schedule_cron": null, "schedule_enabled": false,
       "is_active": true, "priority": 0, "tags": ["custom", "topic"]
@@ -115,12 +115,15 @@
       "export_id": 10,
       "name": "Signal Score",
       "job_type": "signal_score_agent",
-      "description": "Custom agent - drops hype-overlapping or non-persistent topics, keeps quiet-but-recurring ones.",
+      "description": "Custom agent - drops hype-overlapping, oversold, or non-persistent topics, keeps quiet-but-recurring ones, and surfaces each story cluster at most once a week.",
       "config": {
         "max_distinct_sources_48h": 4,
         "min_recurrences": 2,
         "min_span_days": 10,
-        "hype_terms_max_age_hours": 6
+        "hype_terms_max_age_hours": 6,
+        "max_hype_overlap": 0.5,
+        "max_hype_language_hits": 1,
+        "resurface_cooldown_days": 7
       },
       "schedule_cron": null, "schedule_enabled": false,
       "is_active": true, "priority": 0, "tags": ["custom", "scoring"]

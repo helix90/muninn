@@ -8,6 +8,7 @@ term-frequency / adjacent-bigram heuristics. Good enough to separate
 model calls.
 """
 
+import html
 import re
 from collections import Counter
 from urllib.parse import urlparse
@@ -59,7 +60,106 @@ american british french german chinese russian italian japanese
 korean indian canadian australian european asian african latin
 """.split())
 
+# Promotional / clickbait vocabulary. These words say how loudly a story is
+# being sold, not what it is about, so they are never topic terms - and
+# TopicExtractAgent reports which ones it saw so SignalScoreAgent can drop
+# items that lean on them.
+HYPE_LANGUAGE_WORDS = frozenset("""
+revolutionary revolutionize revolutionizes revolutionizing revolution
+game-changing game-changer gamechanger groundbreaking ground-breaking
+breakthrough breakthroughs disruptive disrupt disrupts disrupting
+unprecedented mind-blowing jaw-dropping insane shocking stunning
+incredible amazing astonishing ultimate must-read must-see must-have
+viral exclusive breaking skyrocket skyrockets skyrocketing soar soars
+soaring explodes exploding slams destroys epic next-gen next-generation
+cutting-edge bleeding-edge world-class best-in-class industry-leading
+unveil unveils unveiled supercharge supercharges turbocharge 10x
+hottest hype hyped massive huge
+""".split())
+
+HYPE_LANGUAGE_PHRASES = (
+    "you won't believe", "here's why", "here is why", "what you need to know",
+    "everything you need to know", "changes everything", "change everything",
+    "the future of", "this one trick", "will blow your mind", "is dead",
+    "is here", "goes viral", "taking over", "nobody is talking about",
+)
+
 _WORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9'\-]{2,}")
+
+# Every word-like run, including short words and numbers, so that a dropped
+# token (stopword, too-short word) can be seen as a gap between two content
+# words rather than silently collapsed.
+_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'\-]*")
+
+# Sentence/clause punctuation that should stop a bigram forming across it.
+_BOUNDARY_RE = re.compile(
+    r"[.,;:!?|]+(?=\s|$)|[()\[\]{}\"\u2013\u2014\u201c\u201d\n\r\t]|\s-+\s"
+)
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+
+# Boilerplate injected by common feed generators. Left in, it dominates term
+# counts: every hnrss.org item's summary repeats "Article URL / Comments URL /
+# Points / # Comments" plus two URLs, so before cleaning, EVERY Hacker News
+# item got the same topic_key ("href https") and clustered together.
+_FEED_BOILERPLATE_RES = [
+    re.compile(p, re.IGNORECASE) for p in (
+        r"\b(?:article|comments)\s+url\s*:",                    # hnrss.org
+        r"\bpoints\s*:\s*\d+",                                 # hnrss.org
+        r"#?\s*\bcomments\s*:\s*\d+",                           # hnrss.org
+        r"\b(?:show|ask|tell|launch)\s+hn\s*:",                  # HN title prefixes
+        r"\barxiv:\S+(?:\s+announce\s+type:\s*\S+)?",            # arXiv listing header
+        r"\babstract\s*:",                                      # arXiv
+        r"\bthe\s+post\s+.{0,200}?\s+appeared\s+first\s+on\s+[^.]*\.?",  # WordPress footer
+        r"\b(?:continue\s+reading|read\s+more|read\s+the\s+full\s+(?:story|article))\b",
+        r"\bsubmitted\s+by\s+/?u/\S+",                          # reddit
+        r"\[(?:link|comments)\]",                               # reddit
+    )
+]
+
+
+def clean_text(text):
+    """
+    Strip markup and feed boilerplate from RSS title/summary text.
+
+    Tags become clause boundaries (so "</p><p>" can't glue the last word of
+    one paragraph to the first word of the next), entities are decoded, and
+    URLs plus known feed-generator boilerplate are removed.
+    """
+    if not text:
+        return ''
+    text = _TAG_RE.sub(' \n ', str(text))
+    text = html.unescape(text)
+    text = _URL_RE.sub(' ', text)
+    for pattern in _FEED_BOILERPLATE_RES:
+        text = pattern.sub(' \n ', text)
+    return text
+
+
+def _segments(text, min_length, stopwords):
+    """
+    Split text into runs of consecutive content words.
+
+    A run ends at clause punctuation or at any token that gets dropped
+    (stopword, short word, number), so adjacent-word bigrams only come from
+    words that were actually adjacent in the source: "state of the art"
+    yields no "state art", and "Rust. Python tooling" yields no "rust python".
+    """
+    segments = []
+    for chunk in _BOUNDARY_RE.split(text):
+        current = []
+        for raw in _TOKEN_RE.findall(chunk):
+            w = raw.lower().strip("-'")
+            if (len(w) >= min_length and w[0].isalpha()
+                    and w not in stopwords and not w.isdigit()):
+                current.append(w)
+            elif current:
+                segments.append(current)
+                current = []
+        if current:
+            segments.append(current)
+    return segments
 
 
 def tokenize(text, min_length=4, stopwords=None):
@@ -71,28 +171,36 @@ def tokenize(text, min_length=4, stopwords=None):
     return [w for w in words if len(w) >= min_length and w and w not in sw and not w.isdigit()]
 
 
+def _words_and_bigrams(text, min_length, stopwords):
+    sw = stopwords if stopwords is not None else STOPWORDS
+    words, bigrams = [], []
+    for seg in _segments(text or '', min_length, sw):
+        words.extend(seg)
+        bigrams.extend(f'{a} {b}' for a, b in zip(seg, seg[1:]))
+    return words, bigrams
+
+
 def top_terms_for_document(text, max_terms=3, min_length=4, stopwords=None):
     """
     Rank candidate terms within a single document (title/summary).
 
     Adjacent-word bigrams get a meaningful boost over lone unigrams, since
     two-word phrases ("supply chain", "carbon capture") are usually more
-    informative than either word alone. Ties are broken by first-occurrence
-    position (earlier = more likely to be the actual subject, especially
-    since titles are prepended), NOT by string length - preferring the
-    longest string on a tie tends to surface incidental noise phrases
+    informative than either word alone. Bigrams are only formed from words
+    that were truly adjacent (see _segments). Ties are broken by first-
+    occurrence position (earlier = more likely to be the actual subject,
+    especially since titles are prepended), NOT by string length - preferring
+    the longest string on a tie tends to surface incidental noise phrases
     ("next infrastructure") over the real 2-word subject ("supply chain")
     whenever everything in a short document only appears once.
     """
-    words = tokenize(text, min_length=min_length, stopwords=stopwords)
+    words, bigrams = _words_and_bigrams(text, min_length, stopwords)
     if not words:
         return []
 
     first_seen = {}
     for i, w in enumerate(words):
         first_seen.setdefault(w, i)
-
-    bigrams = [f'{a} {b}' for a, b in zip(words, words[1:])]
     for i, bg in enumerate(bigrams):
         first_seen.setdefault(bg, i)
 
@@ -109,6 +217,46 @@ def top_terms_for_document(text, max_terms=3, min_length=4, stopwords=None):
     return [term for term, _ in ranked[:max_terms]]
 
 
+def _phrase_re(phrase):
+    return re.compile(r'(?<![a-z0-9])' + re.escape(phrase) + r'(?![a-z0-9])', re.IGNORECASE)
+
+
+def strip_hype_phrases(text, extra_phrases=()):
+    """Replace multi-word hype phrases with a clause boundary so they can't
+    surface as topic bigrams ("changes everything")."""
+    if not text:
+        return ''
+    for phrase in list(HYPE_LANGUAGE_PHRASES) + [p for p in extra_phrases if ' ' in p]:
+        text = _phrase_re(phrase.lower().strip()).sub(' \n ', text)
+    return text
+
+
+def hype_language_hits(text, extra_terms=None):
+    """
+    Promotional/clickbait words and phrases present in text, sorted and
+    de-duplicated. extra_terms extends the built-in lexicon (single words or
+    multi-word phrases, case-insensitive).
+    """
+    if not text:
+        return []
+    words = {w.lower().strip("-'") for w in _TOKEN_RE.findall(text)}
+
+    hits = {w for w in words if w in HYPE_LANGUAGE_WORDS}
+    phrases = list(HYPE_LANGUAGE_PHRASES)
+    for term in extra_terms or []:
+        term = term.lower().strip()
+        if not term:
+            continue
+        if ' ' in term:
+            phrases.append(term)
+        elif term in words:
+            hits.add(term)
+    for phrase in phrases:
+        if _phrase_re(phrase).search(text):
+            hits.add(phrase)
+    return sorted(hits)
+
+
 def document_term_set(text, min_length=4, stopwords=None):
     """Unique unigrams and bigrams in one document, for corpus-level
     document-frequency counting.
@@ -119,9 +267,8 @@ def document_term_set(text, min_length=4, stopwords=None):
     even when both constituent words individually fail to rank in the top-N
     unigrams — the phrase-level signal is missed entirely.
     """
-    words = tokenize(text, min_length=min_length, stopwords=stopwords)
-    bigrams = {f'{a} {b}' for a, b in zip(words, words[1:])}
-    return set(words) | bigrams
+    words, bigrams = _words_and_bigrams(text, min_length, stopwords)
+    return set(words) | set(bigrams)
 
 
 def domain_from_url(url):

@@ -121,3 +121,74 @@ class TestTopicExtractAgentExtraction:
         result = agent.check([event])
         assert result[0].payload['author'] == 'Jane Doe'
         assert result[0].payload['link'] == 'https://example.com/battery'
+
+    def test_hn_feed_boilerplate_is_not_a_topic(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'max_topics_per_item': 5})
+        event = _make_event(test_job, {
+            'title': 'Show HN: A tiny Rust allocator for embedded systems',
+            'summary': (
+                '<p>Article URL: <a href="https://github.com/foo/bar">https://github.com/foo/bar</a></p>\n'
+                '<p>Comments URL: <a href="https://news.ycombinator.com/item?id=1">'
+                'https://news.ycombinator.com/item?id=1</a></p>\n'
+                '<p>Points: 3</p>\n<p># Comments: 0</p>'
+            ),
+            'link': 'https://github.com/foo/bar',
+        })
+        terms = agent.check([event])[0].payload['topic_terms']
+        assert terms[0] == 'tiny rust'
+        noise = {'href', 'https', 'comments', 'article', 'points', 'show', 'news', 'ycombinator'}
+        assert not any(set(t.split()) & noise for t in terms)
+
+    def test_arxiv_header_is_not_a_topic(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'max_topics_per_item': 5})
+        event = _make_event(test_job, {
+            'title': 'Sparse Attention for Retrieval',
+            'summary': 'arXiv:2410.01234v1 Announce Type: new \nAbstract: We propose sparse attention for retrieval.',
+        })
+        terms = agent.check([event])[0].payload['topic_terms']
+        assert terms[0] == 'sparse attention'
+        assert not any(w in t for t in terms for w in ('arxiv', 'announce', 'abstract'))
+
+    def test_bigrams_do_not_span_stopwords_punctuation_or_fields(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'max_topics_per_item': 10})
+        event = _make_event(test_job, {
+            'title': 'State of the art in Rust. Python tooling',
+            'summary': 'Compiler internals',
+        })
+        terms = agent.check([event])[0].payload['topic_terms']
+        assert 'python tooling' in terms
+        assert 'state art' not in terms
+        assert 'rust python' not in terms
+        assert 'tooling compiler' not in terms
+
+    def test_hype_language_flagged_and_excluded_from_topics(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {'max_topics_per_item': 5})
+        event = _make_event(test_job, {
+            'title': "Revolutionary startup unveils game-changing battery chemistry. Here's why it changes everything",
+        })
+        payload = agent.check([event])[0].payload
+        assert {'revolutionary', 'game-changing', 'unveils', "here's why", 'changes everything'} <= set(payload['hype_language'])
+        assert 'battery chemistry' in payload['topic_terms']
+        for t in payload['topic_terms']:
+            assert not set(t.split()) & {'revolutionary', 'game-changing', 'unveils', 'changes', 'everything'}
+
+    def test_plain_item_has_empty_hype_language(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session)
+        event = _make_event(test_job, {'title': 'Municipal water utilities adopt leak detection sensors'})
+        assert agent.check([event])[0].payload['hype_language'] == []
+
+    def test_exclude_and_extra_hype_terms(self, test_job, db_session):
+        agent = self._make_agent(test_job, db_session, {
+            'max_topics_per_item': 5,
+            'exclude_terms': ['weekly'],
+            'extra_hype_terms': ['agentic', 'paradigm shift'],
+        })
+        event = _make_event(test_job, {'title': 'Weekly roundup: agentic paradigm shift in compiler testing'})
+        payload = agent.check([event])[0].payload
+        assert payload['hype_language'] == ['agentic', 'paradigm shift']
+        assert 'compiler testing' in payload['topic_terms']
+        assert not any(w in t for t in payload['topic_terms'] for w in ('weekly', 'agentic', 'paradigm'))
+
+    def test_term_lists_must_be_string_lists(self, test_job, db_session):
+        with pytest.raises(ValueError, match='exclude_terms'):
+            self._make_agent(test_job, db_session, {'exclude_terms': 'weekly'})

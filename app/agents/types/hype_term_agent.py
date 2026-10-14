@@ -13,7 +13,7 @@ from collections import Counter
 
 from app.agents.base import TransformAgent
 from app.agents.registry import register_agent
-from app.agents.text_utils import document_term_set
+from app.agents.text_utils import clean_text, document_term_set
 from app.models import Event
 
 
@@ -71,8 +71,10 @@ class HypeTermAgent(TransformAgent):
         doc_frequency = Counter()
 
         for event in events:
-            text = ' '.join(
-                str(event.get_payload_field(field, '') or '')
+            # Same cleaning as TopicExtractAgent, so snapshot terms and topic
+            # terms are drawn from the same vocabulary and can match exactly.
+            text = '\n'.join(
+                clean_text(event.get_payload_field(field, '') or '')
                 for field in source_fields
             )
             terms = document_term_set(text, min_length=min_length)
